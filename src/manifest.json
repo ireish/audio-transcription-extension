@@ -4,9 +4,9 @@
     "version": "0.0.1",
     "description": "A live audio to text transcriber",
     "icons": {
-        "16": "images/icon-16.png",
-        "48": "images/icon-48.png",
-        "128": "images/icon-128.png"
+        "16": "public/icon-16.png",
+        "48": "public/icon-48.png",
+        "128": "public/icon-128.png"
     },
     "action": {
         "default_popup": "src/popup.tsx"
