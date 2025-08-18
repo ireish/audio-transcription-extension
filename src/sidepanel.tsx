@@ -17,36 +17,25 @@ const SidePanel: React.FC = () => {
   }
 
   return (
-    <div style={{ padding: '20px', height: '100vh', backgroundColor: '#f5f5f5' }}>
-      <h1>Live Audio Transcription</h1>
+    <div className="p-5 h-screen bg-gray-100">
+      <h1 className="text-2xl font-bold mb-5">Live Audio Transcription</h1>
       
-      <div style={{ marginBottom: '20px' }}>
+      <div className="mb-5">
         <button 
           onClick={toggleRecording}
-          style={{
-            padding: '12px 24px',
-            backgroundColor: isRecording ? '#f44336' : '#4CAF50',
-            color: 'white',
-            border: 'none',
-            borderRadius: '6px',
-            cursor: 'pointer',
-            fontSize: '16px'
-          }}
+          className={`px-6 py-3 text-white border-none rounded-md cursor-pointer text-base font-medium transition-colors ${
+            isRecording 
+              ? 'bg-red-500 hover:bg-red-600' 
+              : 'bg-green-500 hover:bg-green-600'
+          }`}
         >
           {isRecording ? 'Stop Recording' : 'Start Recording'}
         </button>
       </div>
 
-      <div style={{
-        backgroundColor: 'white',
-        border: '1px solid #ddd',
-        borderRadius: '6px',
-        padding: '16px',
-        minHeight: '200px',
-        fontFamily: 'monospace'
-      }}>
-        <h3>Transcript:</h3>
-        <p>{transcript || 'No audio being transcribed...'}</p>
+      <div className="bg-white border border-gray-300 rounded-md p-4 min-h-[200px] font-mono">
+        <h3 className="text-lg font-semibold mb-2">Transcript:</h3>
+        <p className="text-gray-700">{transcript || 'No audio being transcribed...'}</p>
       </div>
     </div>
   )

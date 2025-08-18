@@ -4,22 +4,15 @@ import './index.css'
 
 const Popup: React.FC = () => {
   return (
-    <div style={{ width: '300px', padding: '16px' }}>
-      <h2>Audio Transcription</h2>
-      <p>Live audio to text transcriber</p>
-      <button 
+    <div className="w-[300px] p-4">
+      <h2 className="text-lg font-bold">Audio Transcription</h2>
+      <p className="text-sm text-gray-600 mb-4">Live audio to text transcriber</p>
+      <button
         onClick={() => {
           // Open side panel
           chrome.sidePanel.open({ windowId: chrome.windows.WINDOW_ID_CURRENT });
         }}
-        style={{
-          padding: '8px 16px',
-          backgroundColor: '#4CAF50',
-          color: 'white',
-          border: 'none',
-          borderRadius: '4px',
-          cursor: 'pointer'
-        }}
+        className="w-full py-2 px-4 bg-blue-500 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-opacity-75"
       >
         Open Transcriber
       </button>
