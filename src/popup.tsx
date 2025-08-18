@@ -32,3 +32,5 @@ if (container) {
   const root = createRoot(container)
   root.render(<Popup />)
 }
+
+export default Popup
