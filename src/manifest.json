@@ -26,12 +26,6 @@
     "side_panel": {
         "default_path": "sidepanel.html"
     },
-    "content_scripts": [
-        {
-            "matches": ["<all_urls>"],
-            "js": ["src/content.ts"]
-        }
-    ],
     "background": {
         "service_worker": "src/service-worker.ts"
     },
