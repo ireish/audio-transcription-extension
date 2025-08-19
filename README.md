@@ -69,7 +69,6 @@ A Chrome browser extension that provides real-time audio transcription using Goo
 
 - **Framework**: React 19 with TypeScript
 - **Build Tool**: Vite with CRXJS plugin
-- **Styling**: Tailwind CSS
 - **Extension API**: Chrome Extension Manifest V3
 - **Linting**: ESLint with TypeScript support
 
