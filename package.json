@@ -11,14 +11,12 @@
     "build:watch": "vite build --watch"
   },
   "dependencies": {
-    "@tailwindcss/postcss": "^4.1.12",
     "react": "^19.1.1",
     "react-dom": "^19.1.1"
   },
   "devDependencies": {
     "@crxjs/vite-plugin": "^2.2.0",
     "@eslint/js": "^9.33.0",
-    "@tailwindcss/cli": "^4.1.12",
     "@types/chrome": "^0.1.4",
     "@types/node": "^24.3.0",
     "@types/react": "^19.1.10",
@@ -29,8 +27,6 @@
     "eslint-plugin-react-hooks": "^5.2.0",
     "eslint-plugin-react-refresh": "^0.4.20",
     "globals": "^16.3.0",
-    "postcss": "^8.5.6",
-    "tailwindcss": "^4.1.12",
     "typescript": "~5.8.3",
     "typescript-eslint": "^8.39.1",
     "vite": "^5.4.19"
