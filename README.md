@@ -1,69 +1,151 @@
-# React + TypeScript + Vite
+# Live Audio to Text Transcriber
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A Chrome browser extension that provides real-time audio transcription using Google's Gemini API. This extension captures audio from your microphone or browser tabs and converts speech to text in real-time through a convenient side panel interface.
 
-Currently, two official plugins are available:
+## Features
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- 🎤 **Real-time Audio Transcription**: Live conversion of speech to text
+- 🔒 **Secure API Integration**: Uses Google Gemini API for accurate transcription
+- 📱 **Side Panel Interface**: Clean, modern UI accessible from any webpage
+- 🎛️ **Audio Controls**: Toggle microphone access and recording states
+- 📋 **Copy & Export**: Copy transcriptions to clipboard or download as TXT/JSON
+- ⏱️ **Recording Timer**: Track session duration
+- 💾 **Local Storage**: Securely store API keys locally
 
-## Expanding the ESLint configuration
+## Installation
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+### From Source
 
-```js
-export default tseslint.config([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+1. Clone this repository:
+   ```bash
+   git clone <your-repo-url>
+   cd audio-transcription-extension
+   ```
 
-      // Remove tseslint.configs.recommended and replace with this
-      ...tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      ...tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      ...tseslint.configs.stylisticTypeChecked,
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+3. Build the extension:
+   ```bash
+   npm run build
+   ```
+
+4. Load in Chrome:
+   - Open Chrome and navigate to `chrome://extensions/`
+   - Enable "Developer mode" in the top right
+   - Click "Load unpacked" and select the `dist` folder
+
+## Setup
+
+1. **Get a Gemini API Key**:
+   - Visit [Google AI Studio](https://makersuite.google.com/app/apikey)
+   - Create a new API key for Gemini
+   - Copy the generated key
+
+2. **Configure the Extension**:
+   - Click the extension icon in Chrome
+   - Enter your Gemini API key in the side panel
+   - Click "Save" to store the key securely
+
+## Usage
+
+1. **Open the Side Panel**: Click the extension icon in your browser toolbar
+2. **Configure Audio**: Ensure microphone access is enabled
+3. **Start Recording**: Click the microphone button to begin transcription
+4. **View Results**: Transcribed text appears in real-time in the panel
+5. **Export Data**: Use the copy, TXT, or JSON buttons to save your transcription
+
+## Development
+
+### Prerequisites
+
+- Node.js 16+ 
+- npm or yarn
+- Chrome browser
+
+### Tech Stack
+
+- **Framework**: React 19 with TypeScript
+- **Build Tool**: Vite with CRXJS plugin
+- **Styling**: Tailwind CSS
+- **Extension API**: Chrome Extension Manifest V3
+- **Linting**: ESLint with TypeScript support
+
+### Available Scripts
+
+```bash
+# Development with hot reload
+npm run dev
+
+# Build for production
+npm run build
+
+# Build and watch for changes
+npm run build:watch
+
+# Lint code
+npm run lint
+
+# Preview production build
+npm run preview
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+### Project Structure
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default tseslint.config([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
 ```
+src/
+├── manifest.json          # Extension manifest (Manifest V3)
+├── content.ts             # Content script
+├── service-worker.ts      # Background service worker
+├── sidepanel.tsx          # Main UI component
+├── sidepanel.css          # Styles for side panel
+└── assets/                # Static assets
+```
+
+## Permissions
+
+This extension requires the following permissions:
+
+- `activeTab`: Access to current tab for audio capture
+- `storage`: Store API keys and settings
+- `sidePanel`: Display the transcription interface
+- `tabCapture`: Capture audio from browser tabs
+- `audioCapture`: Access microphone audio
+- `microphone`: Microphone access permission
+
+## Privacy & Security
+
+- API keys are stored locally in Chrome's secure storage
+- Audio data is processed through Google's Gemini API
+- No audio data is stored locally or transmitted elsewhere
+- Extension follows Chrome Web Store privacy policies
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch: `git checkout -b feature/new-feature`
+3. Commit changes: `git commit -am 'Add new feature'`
+4. Push to branch: `git push origin feature/new-feature`
+5. Submit a pull request
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## Support
+
+If you encounter issues or have questions:
+
+1. Check the [Issues](../../issues) page for existing solutions
+2. Create a new issue with detailed information about the problem
+3. Include Chrome version, extension version, and steps to reproduce
+
+## Changelog
+
+### Version 0.0.1
+- Initial release
+- Basic audio transcription functionality
+- Side panel interface
+- Gemini API integration
