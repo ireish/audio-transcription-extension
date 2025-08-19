@@ -4,3 +4,4 @@ build
 .env
 .cursor/
 package-lock.json
+.temp

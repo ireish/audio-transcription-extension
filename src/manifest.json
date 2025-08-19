@@ -8,7 +8,9 @@
         "48": "public/icon-48.png",
         "128": "public/icon-128.png"
     },
-    "action": {},
+    "action": {
+        "default_popup": "index.html"
+    },
     "permissions": [
         "activeTab",
         "storage",
