@@ -17,6 +17,34 @@ chrome.runtime.onStartup.addListener(() => {
   console.log('Audio Transcription Extension started')
 })
 
+// Configure side panel behavior: open on action click (toolbar icon)
+chrome.runtime.onInstalled.addListener(async () => {
+  try {
+    await chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true })
+  } catch (e) {
+    console.warn('Failed to set side panel behavior on install', e)
+  }
+})
+
+// Optional: keep side panel enabled for each tab so it persists when navigating
+async function enableSidePanelForTab(tabId: number) {
+  try {
+    await chrome.sidePanel.setOptions({ tabId, enabled: true })
+  } catch (error) {
+    console.warn('Failed to enable side panel for tab', tabId, error)
+  }
+}
+
+chrome.tabs.onActivated.addListener(async (activeInfo) => {
+  await enableSidePanelForTab(activeInfo.tabId)
+})
+
+chrome.tabs.onUpdated.addListener(async (tabId, changeInfo) => {
+  if (changeInfo.status === 'complete') {
+    await enableSidePanelForTab(tabId)
+  }
+})
+
 // Handle messages from content scripts or popup
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   console.log('Message received in service worker:', message)
@@ -45,12 +73,8 @@ async function handleStartTranscription(data: any) {
     // TODO: Implement audio capture and transcription logic
     console.log('Starting transcription with data:', data)
     
-    // Request tab capture permissions if needed
-    const stream = await chrome.tabCapture.getMediaStreamId({
-      consumerTabId: chrome.tabs.getCurrent().then(tab => tab?.id ?? 0)
-    })
-    
-    console.log('Tab capture started with stream:', stream)
+    // TODO: Request audio stream from the active tab or microphone in a UI-initiated context
+    // Placeholder: no-op to keep typings happy until implemented
   } catch (error) {
     console.error('Error starting transcription:', error)
   }

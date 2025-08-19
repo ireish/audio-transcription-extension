@@ -8,9 +8,7 @@
         "48": "public/icon-48.png",
         "128": "public/icon-128.png"
     },
-    "action": {
-        "default_popup": "index.html"
-    },
+    "action": {},
     "permissions": [
         "activeTab",
         "storage",
@@ -20,7 +18,7 @@
         "microphone"
     ],
     "side_panel": {
-        "default_path": "src/sidepanel.tsx"
+        "default_path": "sidepanel.html"
     },
     "content_scripts": [
         {
