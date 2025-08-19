@@ -1,4 +1,4 @@
-# Live Audio to Text Transcriber
+# Live Audio to Text Transcriber [In Progress . . .]
 
 A Chrome browser extension that provides real-time audio transcription using Google's Gemini API. This extension captures audio from your microphone or browser tabs and converts speech to text in real-time through a convenient side panel interface.
 
