@@ -12,6 +12,26 @@ chrome.runtime.onInstalled.addListener((details) => {
   })
 })
 
+// Create offscreen document for audio processing when needed
+async function createOffscreenDocument() {
+  // Check if offscreen document already exists
+  const existingContexts = await chrome.runtime.getContexts({
+    contextTypes: ['OFFSCREEN_DOCUMENT'],
+    documentUrls: [chrome.runtime.getURL('offscreen.html')]
+  })
+
+  if (existingContexts.length > 0) {
+    return // Already exists
+  }
+
+  // Create the offscreen document
+  await chrome.offscreen.createDocument({
+    url: 'offscreen.html',
+    reasons: ['AUDIO_PLAYBACK'],
+    justification: 'Audio processing for transcription'
+  })
+}
+
 // Handle extension startup
 chrome.runtime.onStartup.addListener(() => {
   console.log('Audio Transcription Extension started')

@@ -17,11 +17,7 @@
         "sidePanel",
         "tabCapture",
         "audioCapture",
-        "microphone",
         "offscreen"
-    ],
-    "offscreen_pages": [
-        "offscreen.html"
     ],
     "side_panel": {
         "default_path": "sidepanel.html"
