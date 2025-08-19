@@ -13,6 +13,9 @@ const SidePanel: React.FC = () => {
   const [elapsedMs, setElapsedMs] = useState(0)
   const startTimeRef = useRef<number | null>(null)
   const timerRef = useRef<number | null>(null)
+  const mediaStreamRef = useRef<MediaStream | null>(null)
+  const BACKEND_WS_URL = 'ws://localhost:3001/stream'
+  const BACKEND_HTTP_URL = 'http://localhost:3001/upload'
 
   // Load stored API key on mount
   useEffect(() => {
@@ -79,13 +82,41 @@ const SidePanel: React.FC = () => {
 
   // If needed in future: function to reset the timer
 
-  const startTranscription = () => {
-    // Placeholder: simulate a live message line when recording starts
-    setTranscriptionText('')
+  // No longer needed here: WS/MediaRecorder handled by offscreen document
+
+  const startTranscription = async () => {
+    try {
+      setErrorMessage(null)
+      setTranscriptionText('')
+
+      // Ensure offscreen document exists
+      // @ts-ignore
+      const hasOffscreen = await chrome.offscreen?.hasDocument?.()
+      if (!hasOffscreen) {
+        // @ts-ignore
+        await chrome.offscreen?.createDocument?.({
+          url: 'offscreen.html',
+          reasons: ['AUDIO_PLAYBACK'],
+          justification: 'Capture tab audio and stream PCM 16k via WS/HTTP'
+        })
+      }
+      // Ask offscreen to start capture + stream
+      await chrome.runtime.sendMessage({
+        target: 'offscreen',
+        type: 'START',
+        backend: { wsUrl: BACKEND_WS_URL, httpUrl: BACKEND_HTTP_URL }
+      })
+    } catch (e: any) {
+      console.error('Failed to start transcription', e)
+      showMessage(e?.message || 'Failed to start recording')
+      try { mediaStreamRef.current?.getTracks().forEach(t => t.stop()) } catch {}
+    }
   }
 
   const stopTranscription = () => {
-    // Placeholder for stopping transcription
+    try {
+      chrome.runtime.sendMessage({ target: 'offscreen', type: 'STOP' })
+    } catch {}
   }
 
   const toggleRecording = () => {

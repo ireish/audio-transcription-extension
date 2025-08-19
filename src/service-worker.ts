@@ -22,8 +22,7 @@ chrome.runtime.onInstalled.addListener(async () => {
   try {
     await chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true })
   } catch (e) {
-    window.alert('Failed to set side panel behavior on install')
-    console.error('Failed to set side panel behavior on install', e)
+    console.warn('Failed to set side panel behavior on install', e)
   }
 })
 
