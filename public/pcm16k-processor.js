@@ -1,3 +1,11 @@
+// @ts-nocheck
+
+// Speech recognition and AI models optimized to work with a 16kHz sample rate.
+// Downsampling the audio to 16kHz makes it compatible with these systems and reduces the data rate
+
+// AudioWorkletProcessor runs in a separate thread from the main JS thread,
+// ensuring that the audio processing & downsampling does not cause the main thread to freeze.
+
 class PCM16kProcessor extends AudioWorkletProcessor {
   constructor() {
     super()
