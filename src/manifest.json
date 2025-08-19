@@ -9,7 +9,7 @@
         "128": "public/icon-128.png"
     },
     "action": {
-        "default_popup": "index.html"
+        "default_title": "Open Side Panel"
     },
     "permissions": [
         "activeTab",
