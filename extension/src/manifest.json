@@ -16,7 +16,6 @@
         "storage",
         "sidePanel",
         "tabCapture",
-        "audioCapture",
         "offscreen"
     ],
     "side_panel": {

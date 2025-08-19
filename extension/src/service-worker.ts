@@ -35,6 +35,8 @@ async function createOffscreenDocument() {
 // Handle extension startup
 chrome.runtime.onStartup.addListener(() => {
   console.log('Audio Transcription Extension started')
+  // Ensure offscreen document exists (idempotent)
+  createOffscreenDocument().catch((e) => console.warn('Offscreen init skipped/failed:', e))
 })
 
 // Configure side panel behavior: open on action click (toolbar icon)
