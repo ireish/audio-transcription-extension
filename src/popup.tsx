@@ -1,20 +1,37 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
 
 const Popup: React.FC = () => {
+  const [apiKey, setApiKey] = useState('')
+
+  const handleSubmit = () => {
+    if (apiKey.trim()) {
+      // Store the API key in chrome storage
+      chrome.storage.sync.set({ geminiApiKey: apiKey }, () => {
+        console.log('API key saved')
+        // Close the popup
+        window.close()
+      })
+    }
+  }
+
   return (
     <div className="w-[300px] p-4">
-      <h2 className="text-lg font-bold">Audio Transcription</h2>
-      <p className="text-sm text-gray-600 mb-4">Live audio to text transcriber</p>
+      <h2 className="text-lg font-bold mb-4">Enter Gemini API Key</h2>
+      <input
+        type="password"
+        value={apiKey}
+        onChange={(e) => setApiKey(e.target.value)}
+        placeholder="Enter your Gemini API key"
+        className="w-full p-2 border border-gray-300 rounded-lg mb-6 focus:outline-none focus:ring-2 focus:ring-blue-400"
+      />
       <button
-        onClick={() => {
-          // Open side panel
-          chrome.sidePanel.open({ windowId: chrome.windows.WINDOW_ID_CURRENT });
-        }}
-        className="w-full py-2 px-4 bg-blue-500 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-opacity-75"
+        onClick={handleSubmit}
+        disabled={!apiKey.trim()}
+        className="w-full py-2 px-4 bg-blue-400 text-white font-semibold rounded-lg shadow-md hover:bg-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-300 focus:ring-opacity-75 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors duration-200"
       >
-        Open Transcriber
+        Submit
       </button>
     </div>
   )
