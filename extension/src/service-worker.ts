@@ -1,71 +1,85 @@
-// Background service worker for Chrome extension
-// This handles background tasks and extension lifecycle events
+// Set the side panel to open when the user clicks the action toolbar icon.
+chrome.runtime.onInstalled.addListener(() => {
+  chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch((error) => {
+    console.error('Failed to set side panel behavior:', error);
+  });
+});
 
-// Extension installation
-chrome.runtime.onInstalled.addListener((details) => {
-  console.log('Audio Transcription Extension installed:', details)
-  
-  // Set up default settings
-  chrome.storage.sync.set({
-    transcriptionEnabled: false,
-    language: 'en-US'
-  })
-})
-
-// Create offscreen document for audio processing when needed
 async function createOffscreenDocument() {
-  // Check if offscreen document already exists
   const existingContexts = await chrome.runtime.getContexts({
     contextTypes: ['OFFSCREEN_DOCUMENT'],
-    documentUrls: [chrome.runtime.getURL('offscreen.html')]
-  })
+    documentUrls: [chrome.runtime.getURL('offscreen.html')],
+  });
 
   if (existingContexts.length > 0) {
-    return // Already exists
+    return;
   }
 
-  // Create the offscreen document
   await chrome.offscreen.createDocument({
     url: 'offscreen.html',
     reasons: ['AUDIO_PLAYBACK'],
-    justification: 'Audio processing for transcription'
-  })
+    justification: 'Audio processing for transcription',
+  });
 }
 
-// Handle extension startup
-chrome.runtime.onStartup.addListener(() => {
-  console.log('Audio Transcription Extension started')
-  // Ensure offscreen document exists (idempotent)
-  createOffscreenDocument().catch((e) => console.warn('Offscreen init skipped/failed:', e))
-})
-
-// Configure side panel behavior: open on action click (toolbar icon)
-chrome.runtime.onInstalled.addListener(async () => {
+async function sendToOffscreen(message: any) {
+  // A simple retry mechanism can be kept if you find it necessary,
+  // but often direct messaging is sufficient.
   try {
-    await chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true })
-  } catch (e) {
-    console.warn('Failed to set side panel behavior on install', e)
-  }
-})
-
-// Optional: keep side panel enabled for each tab so it persists when navigating
-async function enableSidePanelForTab(tabId: number) {
-  try {
-    await chrome.sidePanel.setOptions({ tabId, enabled: true })
+    await chrome.runtime.sendMessage(message);
   } catch (error) {
-    console.warn('Failed to enable side panel for tab', tabId, error)
+    console.error('Failed to send message to offscreen document:', error);
+    throw error;
   }
 }
 
-chrome.tabs.onActivated.addListener(async (activeInfo) => {
-  await enableSidePanelForTab(activeInfo.tabId)
-})
+chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+  (async () => {
+    if (message.type === 'OFFSCREEN_START') {
+      await createOffscreenDocument();
 
-chrome.tabs.onUpdated.addListener(async (tabId, changeInfo) => {
-  if (changeInfo.status === 'complete') {
-    await enableSidePanelForTab(tabId)
-  }
-})
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
 
-// Export empty object to make this a module
-export {}
+      if (!tab || !tab.id) {
+        sendResponse({ ok: false, error: 'No active tab found.' });
+        return;
+      }
+      
+      if (tab.url?.startsWith('chrome://') || tab.url?.startsWith('https://chrome.google.com/')) {
+        sendResponse({ ok: false, error: 'Cannot record protected browser pages.' });
+        return;
+      }
+
+      const streamId = await new Promise<string>((resolve) => {
+        chrome.tabCapture.getMediaStreamId({ consumerTabId: tab.id }, (id) => {
+          // Check for runtime.lastError to handle permission errors
+          if (chrome.runtime.lastError) {
+            console.error(chrome.runtime.lastError.message);
+            resolve(''); // Resolve with an empty string to indicate failure
+          } else {
+            resolve(id);
+          }
+        });
+      });
+
+      if (!streamId) {
+        // This will now correctly trigger if activeTab permission wasn't granted
+        sendResponse({ ok: false, error: 'Could not capture tab. Please click the extension icon again to activate it for this page.' });
+        return;
+      }
+
+      await sendToOffscreen({
+        target: 'offscreen',
+        type: 'START',
+        backend: message.backend,
+        streamId: streamId,
+      });
+
+      sendResponse({ ok: true });
+    } else if (message.type === 'OFFSCREEN_STOP') {
+      await sendToOffscreen({ target: 'offscreen', type: 'STOP' });
+      sendResponse({ ok: true });
+    }
+  })();
+  return true; // Keep message channel open for async response
+});

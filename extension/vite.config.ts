@@ -9,6 +9,15 @@ export default defineConfig({
     react(),
     crx({ manifest })
   ],
+  server: {
+    port: 5173,
+    strictPort: true,
+    hmr: {
+      protocol: 'ws',
+      host: 'localhost',
+      clientPort: 5173,
+    },
+  },
   define: {
     // Add polyfills for Node 18 compatibility
     global: 'globalThis',

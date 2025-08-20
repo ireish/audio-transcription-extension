@@ -56,6 +56,7 @@ wss.on('connection', (socket: WebSocket) => {
 
 server.listen(PORT, () => {
   console.log(`Server listening on http://localhost:${PORT}`)
+  console.log(`WebSocket server available at ws://localhost:${PORT}/stream`)
 })
 
 

@@ -23,7 +23,7 @@ async function ensureContext() {
 async function setupWorklet() {
   if (!audioContext) throw new Error('AudioContext not ready')
   try {
-    await audioContext.audioWorklet.addModule('/public/pcm16k-processor.js')
+    await audioContext.audioWorklet.addModule('/pcm16k-processor.js')
   } catch {
     // fallback path if assets served differently
     await audioContext.audioWorklet.addModule('/pcm16k-processor.js')
@@ -103,7 +103,8 @@ function scheduleHttpFlush() {
 
 let currentBackend = { wsUrl: '', httpUrl: '' }
 
-async function startCaptureAndStream(backend: { wsUrl: string, httpUrl: string }) {
+// MODIFIED: This function now accepts the streamId from the service worker
+async function startCaptureAndStream(backend: { wsUrl: string, httpUrl: string }, streamId: string) {
   currentBackend = backend
   await ensureContext()
   await setupWorklet()
@@ -116,23 +117,23 @@ async function startCaptureAndStream(backend: { wsUrl: string, httpUrl: string }
     transportMode = 'http'
   }
 
-  // Capture active tab audio
-  mediaStream = await new Promise<MediaStream>((resolve, reject) => {
-    try {
-      chrome.tabCapture.capture({ audio: true, video: false }, (stream) => {
-        if (chrome.runtime.lastError || !stream) {
-          reject(new Error(chrome.runtime.lastError?.message || 'tabCapture failed'))
-          return
-        }
-        resolve(stream)
-      })
-    } catch (e) {
-      reject(e)
-    }
+  // MODIFIED: Use getUserMedia with the streamId to get the MediaStream
+  if (!streamId) {
+    throw new Error('No stream ID received from service worker.')
+  }
+
+  mediaStream = await navigator.mediaDevices.getUserMedia({
+    audio: {
+      mandatory: {
+        chromeMediaSource: 'tab',
+        chromeMediaSourceId: streamId,
+      },
+    } as any, // Use 'as any' to satisfy TypeScript for this specific structure
+    video: false,
   })
   mediaSource = audioContext!.createMediaStreamSource(mediaStream)
   mediaSource.connect(workletNode!)
-  // Do not connect to destination to avoid echo; if required: workletNode!.connect(audioContext!.destination)
+  // Do not connect to destination to avoid echo
 }
 
 function stopAll() {
@@ -149,14 +150,22 @@ function stopAll() {
 }
 
 chrome.runtime.onMessage.addListener((message) => {
-  if (!message) return
-  if (message.target !== 'offscreen') return
-  if (message.type === 'START') {
-    startCaptureAndStream(message.backend).catch((e) => console.error('Offscreen start failed', e))
-  } else if (message.type === 'STOP') {
-    stopAll()
+  if (message.target !== 'offscreen') {
+    return;
   }
-})
+  switch (message.type) {
+    case 'START':
+      startCaptureAndStream(message.backend, message.streamId).catch((e) =>
+        console.error('Offscreen start failed', message.streamId ? 'with streamId' : 'no streamId', e)
+      );
+      break;
+    case 'STOP':
+      stopAll();
+      break;
+    default:
+      console.warn(`Unexpected message type received: '${message.type}'.`);
+  }
+});
 
 export {}
 

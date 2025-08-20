@@ -89,23 +89,15 @@ const SidePanel: React.FC = () => {
       setErrorMessage(null)
       setTranscriptionText('')
 
-      // Ensure offscreen document exists
-      // @ts-ignore
-      const hasOffscreen = await chrome.offscreen?.hasDocument?.()
-      if (!hasOffscreen) {
-        // @ts-ignore
-        await chrome.offscreen?.createDocument?.({
-          url: 'offscreen.html',
-          reasons: ['AUDIO_PLAYBACK'],
-          justification: 'Capture tab audio and stream PCM 16k via WS/HTTP'
-        })
-      }
-      // Ask offscreen to start capture + stream
-      await chrome.runtime.sendMessage({
-        target: 'offscreen',
-        type: 'START',
+      // Ask service worker to ensure offscreen and start
+      const response = await chrome.runtime.sendMessage({
+        type: 'OFFSCREEN_START',
         backend: { wsUrl: BACKEND_WS_URL, httpUrl: BACKEND_HTTP_URL }
-      })
+      });
+
+      if (response && !response.ok) {
+        throw new Error(response.error || 'Failed to start recording')
+      }
     } catch (e: any) {
       console.error('Failed to start transcription', e)
       showMessage(e?.message || 'Failed to start recording')
@@ -115,7 +107,7 @@ const SidePanel: React.FC = () => {
 
   const stopTranscription = () => {
     try {
-      chrome.runtime.sendMessage({ target: 'offscreen', type: 'STOP' })
+      chrome.runtime.sendMessage({ type: 'OFFSCREEN_STOP' })
     } catch {}
   }
 
