@@ -1,8 +1,15 @@
 // Set the side panel to open when the user clicks the action toolbar icon.
-chrome.runtime.onInstalled.addListener(() => {
-  chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch((error) => {
-    console.error('Failed to set side panel behavior:', error);
-  });
+// chrome.runtime.onInstalled.addListener(() => {
+//   chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch((error) => {
+//     console.error('Failed to set side panel behavior:', error);
+//   });
+// });
+
+// This listener opens the side panel only for the tab where the icon is clicked.
+chrome.action.onClicked.addListener((tab) => {
+  if (tab.id) {
+    chrome.sidePanel.open({ tabId: tab.id });
+  }
 });
 
 async function createOffscreenDocument() {
