@@ -107,7 +107,7 @@ const SidePanel: React.FC = () => {
 
   const stopTranscription = () => {
     try {
-      chrome.runtime.sendMessage({ type: 'OFFSCREEN_STOP' })
+      chrome.runtime.sendMessage({ target: 'offscreen', type: 'STOP' });
     } catch {}
   }
 

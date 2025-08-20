@@ -1,27 +1,22 @@
-// Set the side panel to open when the user clicks the action toolbar icon.
-// chrome.runtime.onInstalled.addListener(() => {
-//   chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch((error) => {
-//     console.error('Failed to set side panel behavior:', error);
-//   });
-// });
+// service-worker.ts
 
-// This listener opens the side panel only for the tab where the icon is clicked.
+// This listener opens the side panel for the specific tab where the icon is clicked.
 chrome.action.onClicked.addListener((tab) => {
   if (tab.id) {
     chrome.sidePanel.open({ tabId: tab.id });
   }
 });
 
+let pendingOffscreenMessage: any = null;
+
 async function createOffscreenDocument() {
   const existingContexts = await chrome.runtime.getContexts({
     contextTypes: ['OFFSCREEN_DOCUMENT'],
     documentUrls: [chrome.runtime.getURL('offscreen.html')],
   });
-
   if (existingContexts.length > 0) {
     return;
   }
-
   await chrome.offscreen.createDocument({
     url: 'offscreen.html',
     reasons: ['AUDIO_PLAYBACK'],
@@ -29,22 +24,19 @@ async function createOffscreenDocument() {
   });
 }
 
-async function sendToOffscreen(message: any) {
-  // A simple retry mechanism can be kept if you find it necessary,
-  // but often direct messaging is sufficient.
-  try {
-    await chrome.runtime.sendMessage(message);
-  } catch (error) {
-    console.error('Failed to send message to offscreen document:', error);
-    throw error;
-  }
-}
-
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   (async () => {
-    if (message.type === 'OFFSCREEN_START') {
-      await createOffscreenDocument();
+    // Handles the "I'm ready" message from the offscreen document
+    if (message.type === 'OFFSCREEN_READY') {
+      if (pendingOffscreenMessage) {
+        await chrome.runtime.sendMessage(pendingOffscreenMessage);
+        pendingOffscreenMessage = null;
+      }
+      sendResponse(true);
+      return;
+    }
 
+    if (message.type === 'OFFSCREEN_START') {
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
 
       if (!tab || !tab.id) {
@@ -58,33 +50,29 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       }
 
       const streamId = await new Promise<string>((resolve) => {
-        chrome.tabCapture.getMediaStreamId({ consumerTabId: tab.id }, (id) => {
-          // Check for runtime.lastError to handle permission errors
-          if (chrome.runtime.lastError) {
-            console.error(chrome.runtime.lastError.message);
-            resolve(''); // Resolve with an empty string to indicate failure
-          } else {
-            resolve(id);
-          }
+        // We must specify the tab we want to capture, but consumerTabId is not
+        // necessary. If not specified, the stream can be consumed in any tab
+        // of the same extension, which is what we want for the offscreen doc.
+        chrome.tabCapture.getMediaStreamId({ targetTabId: tab.id }, (id) => {
+          resolve(chrome.runtime.lastError ? '' : id);
         });
       });
 
       if (!streamId) {
-        // This will now correctly trigger if activeTab permission wasn't granted
-        sendResponse({ ok: false, error: 'Could not capture tab. Please click the extension icon again to activate it for this page.' });
+        sendResponse({ ok: false, error: 'Could not capture tab. Please click the icon again to activate for this page.' });
         return;
       }
 
-      await sendToOffscreen({
+      // Store the command and create the document. The command will be sent
+      // once the document confirms it's ready.
+      pendingOffscreenMessage = {
         target: 'offscreen',
         type: 'START',
         backend: message.backend,
         streamId: streamId,
-      });
+      };
 
-      sendResponse({ ok: true });
-    } else if (message.type === 'OFFSCREEN_STOP') {
-      await sendToOffscreen({ target: 'offscreen', type: 'STOP' });
+      await createOffscreenDocument();
       sendResponse({ ok: true });
     }
   })();

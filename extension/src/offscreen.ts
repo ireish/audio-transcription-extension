@@ -105,6 +105,8 @@ let currentBackend = { wsUrl: '', httpUrl: '' }
 
 // MODIFIED: This function now accepts the streamId from the service worker
 async function startCaptureAndStream(backend: { wsUrl: string, httpUrl: string }, streamId: string) {
+  stopAll();
+  
   currentBackend = backend
   await ensureContext()
   await setupWorklet()
@@ -155,18 +157,24 @@ chrome.runtime.onMessage.addListener((message) => {
   }
   switch (message.type) {
     case 'START':
-      startCaptureAndStream(message.backend, message.streamId).catch((e) =>
-        console.error('Offscreen start failed', message.streamId ? 'with streamId' : 'no streamId', e)
+      startCaptureAndStream(message.backend, message.streamId).catch((e) => {
+          // 🛠️ IMPROVE THIS ERROR LOG 🛠️
+          // This will now print the specific error name and message.
+          if (e instanceof DOMException) {
+            console.error(`Offscreen start failed: ${e.name} - ${e.message}`);
+          } else {
+            console.error('Offscreen start failed', e);
+          }
+        }
       );
       break;
     case 'STOP':
       stopAll();
       break;
-    default:
-      console.warn(`Unexpected message type received: '${message.type}'.`);
   }
 });
 
+// Send a message to the service worker to confirm that the offscreen document is ready.
+chrome.runtime.sendMessage({ type: 'OFFSCREEN_READY' });
+
 export {}
-
-
