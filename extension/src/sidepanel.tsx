@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
-import './sidepanel.css'
+import './styles/sidepanel.css'
 
 const SidePanel: React.FC = () => {
   const [apiKeyInput, setApiKeyInput] = useState('')
