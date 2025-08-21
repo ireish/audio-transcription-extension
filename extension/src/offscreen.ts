@@ -135,7 +135,8 @@ async function startCaptureAndStream(backend: { wsUrl: string, httpUrl: string }
   })
   mediaSource = audioContext!.createMediaStreamSource(mediaStream)
   mediaSource.connect(workletNode!)
-  // Do not connect to destination to avoid echo
+  // To send audio back to speakers
+  mediaSource.connect(audioContext!.destination);
 }
 
 function stopAll() {
