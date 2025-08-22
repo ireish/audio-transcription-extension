@@ -7,9 +7,14 @@ interface TranscriptionLine {
   timestamp: string
 }
 
+interface TranscriptionSession {
+  title: string
+  lines: TranscriptionLine[]
+}
+
 const SidePanel: React.FC = () => {
   const [isRecording, setIsRecording] = useState(false)
-  const [lines, setLines] = useState<TranscriptionLine[]>([])
+  const [sessions, setSessions] = useState<TranscriptionSession[]>([])
   const [currentText, setCurrentText] = useState('')
   const [interimText, setInterimText] = useState('')
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
@@ -42,7 +47,13 @@ const SidePanel: React.FC = () => {
               lineStartTimeRef.current = new Date().toISOString()
             }
             if (newLines.length > 0) {
-              setLines(prevLines => [...prevLines, ...newLines])
+              setSessions(prevSessions => {
+                if (prevSessions.length === 0) return prevSessions
+                const lastSession = prevSessions[prevSessions.length - 1]
+                const updatedLines = [...lastSession.lines, ...newLines]
+                const updatedSession = { ...lastSession, lines: updatedLines }
+                return [...prevSessions.slice(0, -1), updatedSession]
+              })
             }
             return words.join(' ') + ' '
           })
@@ -68,7 +79,7 @@ const SidePanel: React.FC = () => {
     if (transcriptionBoxRef.current) {
       transcriptionBoxRef.current.scrollTop = transcriptionBoxRef.current.scrollHeight
     }
-  }, [lines, currentText, interimText])
+  }, [sessions, currentText, interimText])
 
   const showMessage = (message: string, type: 'success' | 'error' = 'error') => {
     setErrorType(type)
@@ -100,7 +111,13 @@ const SidePanel: React.FC = () => {
       timerRef.current = null
     }
     if (currentText.trim()) {
-      setLines(prev => [...prev, { text: currentText.trim(), timestamp: lineStartTimeRef.current! }])
+      setSessions(prev => {
+        if (prev.length === 0) return prev
+        const lastSession = prev[prev.length - 1]
+        const updatedLines = [...lastSession.lines, { text: currentText.trim(), timestamp: lineStartTimeRef.current! }]
+        const updatedSession = { ...lastSession, lines: updatedLines }
+        return [...prev.slice(0, -1), updatedSession]
+      })
       setCurrentText('')
     }
   }
@@ -112,7 +129,6 @@ const SidePanel: React.FC = () => {
   const startTranscription = async () => {
     try {
       setErrorMessage(null)
-      setLines([])
       setCurrentText('')
       setInterimText('')
       lineStartTimeRef.current = new Date().toISOString()
@@ -125,6 +141,9 @@ const SidePanel: React.FC = () => {
 
       if (response && !response.ok) {
         throw new Error(response.error || 'Failed to start recording')
+      }
+      if (response.title) {
+        setSessions(prev => [...prev, { title: response.title, lines: [] }])
       }
     } catch (e: any) {
       console.error('Failed to start transcription', e)
@@ -151,17 +170,32 @@ const SidePanel: React.FC = () => {
     }
   }
 
-  const copyToClipboard = async () => {
-    const textToCopy = [...lines, { text: currentText, timestamp: lineStartTimeRef.current! }]
-      .map(line => {
-        if (line.text) {
-          const time = `[${new Date(line.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}]`
-          return `${time} ${line.text}`
-        }
-        return ''
-      }).join('\n')
+  const generateTranscriptionText = (includeTimestamps = true) => {
+    let fullText = sessions.map(session => {
+      const sessionTitle = `\n--- ${session.title} ---\n`;
+      const sessionLines = session.lines
+        .map(line => {
+          if (line.text) {
+            const time = `[${new Date(line.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}]`
+            return includeTimestamps ? `${time} ${line.text}` : line.text
+          }
+          return ''
+        })
+        .join('\n')
+      return sessionTitle + sessionLines
+    }).join('\n')
 
-    if (!textToCopy.trim()) {
+    if (currentText.trim()) {
+      const time = `[${new Date(lineStartTimeRef.current!).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}]`
+      const currentLine = includeTimestamps ? `${time} ${currentText.trim()}` : currentText.trim()
+      fullText += `\n${currentLine}`
+    }
+    return fullText.trim()
+  }
+
+  const copyToClipboard = async () => {
+    const textToCopy = generateTranscriptionText()
+    if (!textToCopy) {
       showMessage('No transcription text to copy')
       return
     }
@@ -174,16 +208,8 @@ const SidePanel: React.FC = () => {
   }
 
   const downloadText = () => {
-    const textToDownload = [...lines, { text: currentText, timestamp: lineStartTimeRef.current! }]
-      .map(line => {
-        if (line.text) {
-          const time = `[${new Date(line.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}]`
-          return `${time} ${line.text}`
-        }
-        return ''
-      }).join('\n')
-
-    if (!textToDownload.trim()) {
+    const textToDownload = generateTranscriptionText()
+    if (!textToDownload) {
       showMessage('No transcription text to download')
       return
     }
@@ -199,16 +225,8 @@ const SidePanel: React.FC = () => {
   }
 
   const downloadJson = () => {
-    const textToDownload = [...lines, { text: currentText, timestamp: lineStartTimeRef.current! }]
-      .map(line => {
-        if (line.text) {
-          const time = `[${new Date(line.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}]`
-          return `${time} ${line.text}`
-        }
-        return ''
-      }).join('\n')
-
-    if (!textToDownload.trim()) {
+    const textToDownload = generateTranscriptionText()
+    if (!textToDownload) {
       showMessage('No transcription text to download')
       return
     }
@@ -226,6 +244,15 @@ const SidePanel: React.FC = () => {
     a.click()
     document.body.removeChild(a)
     URL.revokeObjectURL(url)
+  }
+
+  const clearAll = () => {
+    setSessions([])
+    setCurrentText('')
+    setInterimText('')
+    if (!isRecording) {
+      setElapsedMs(0)
+    }
   }
 
   return (
@@ -274,26 +301,31 @@ const SidePanel: React.FC = () => {
             </div>
           </div>
           <div className="transcription-box" id="transcriptionBox" ref={transcriptionBoxRef}>
-            {isRecording && lines.length === 0 && currentText.length === 0 && interimText.length === 0 ? (
+            {isRecording && sessions.length === 0 && currentText.length === 0 && interimText.length === 0 ? (
               <div style={{ color: '#667eea', fontStyle: 'italic' }}>🔴 Recording... Listening for audio input...</div>
             ) : (
               <>
-                {lines.map((line, index) => (
-                  <div key={index} className="transcription-line">
-                    <span className="timestamp">
-                      [{new Date(line.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}]
-                    </span>
-                    {line.text}
+                {sessions.map((session, sessionIndex) => (
+                  <div key={sessionIndex}>
+                    <div className="session-title">{session.title}</div>
+                    {session.lines.map((line, lineIndex) => (
+                      <div key={lineIndex} className="transcription-line">
+                        <span className="timestamp">
+                          [{new Date(line.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}]
+                        </span>
+                        {line.text}
+                      </div>
+                    ))}
                   </div>
                 ))}
                 <div className="transcription-line">
-                  {isRecording && <span className="timestamp">
+                  {isRecording && sessions.length > 0 && <span className="timestamp">
                     [{new Date(lineStartTimeRef.current!).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}]
                   </span>}
                   <span>{currentText}</span>
                   {interimText && <span className="interim-text">{interimText}</span>}
                 </div>
-                {lines.length === 0 && currentText.length === 0 && interimText.length === 0 && (
+                {sessions.length === 0 && currentText.length === 0 && interimText.length === 0 && (
                   <div className="transcription-placeholder">
                     Click the record button to start transcribing audio...
                   </div>
@@ -307,6 +339,7 @@ const SidePanel: React.FC = () => {
         <div className="timer-section">
           <span className="timer-title">Session time: </span>
           <div className="timer" id="timer">{formatTime(elapsedMs)}</div>
+          <button className="action-btn" onClick={clearAll} style={{ marginLeft: '10px' }}>Clear Transcripts</button>
         </div>
       </div>
     </div>

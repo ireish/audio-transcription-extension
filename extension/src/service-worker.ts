@@ -73,7 +73,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       };
 
       await createOffscreenDocument();
-      sendResponse({ ok: true });
+      sendResponse({ ok: true, title: tab.title });
     }
   })();
   return true; // Keep message channel open for async response
