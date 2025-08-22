@@ -32,6 +32,7 @@ const SidePanel: React.FC = () => {
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [errorType, setErrorType] = useState<'success' | 'error'>('error')
   const [isStateLoaded, setIsStateLoaded] = useState(false)
+  const [serverStatus, setServerStatus] = useState<'online' | 'offline' | 'checking'>('checking');
   
   const timerRef = useRef<number | null>(null)
   const lineStartTimeRef = useRef<string | null>(null)
@@ -42,6 +43,23 @@ const SidePanel: React.FC = () => {
   const BACKEND_WS_URL = 'ws://localhost:3001/stream'
   const BACKEND_HTTP_URL = 'http://localhost:3001/upload'
   
+  // Check server status on component mount
+  useEffect(() => {
+    const checkServerStatus = async () => {
+      try {
+        const response = await fetch(`${BACKEND_HTTP_URL.replace('/upload', '')}/health`);
+        if (response.ok) {
+          setServerStatus('online');
+        } else {
+          setServerStatus('offline');
+        }
+      } catch (error) {
+        setServerStatus('offline');
+      }
+    };
+    checkServerStatus();
+  }, []);
+
   // Load state from storage on component mount
   useEffect(() => {
     chrome.storage.local.get('appState', (result) => {
@@ -318,6 +336,7 @@ const SidePanel: React.FC = () => {
           <button
             onClick={toggleRecording}
             className={`record-button ${appState.isRecording ? 'recording' : ''}`}
+            disabled={serverStatus !== 'online'}
           >
             {appState.isRecording ? 'Stop Recording' : 'Start Recording'}
           </button>
@@ -334,15 +353,16 @@ const SidePanel: React.FC = () => {
 
         {/* Notification Status (7%) */}
         <div className="notification-section">
-          {errorMessage && (
-            <div className={`error-notification show`} style={{
-              background: errorType === 'success' ? '#e6ffe6' : '#ffe6e6',
-              borderColor: errorType === 'success' ? '#b3ffb3' : '#ffb3b3',
-              color: errorType === 'success' ? '#006600' : '#cc0000'
-            }}>
+          <h4 className="status-header">Status</h4>
+          {serverStatus === 'offline' ? (
+            <div className="status-message error">Server is offline. Please start the backend server.</div>
+          ) : errorMessage ? (
+            <div className={`status-message ${errorType === 'success' ? 'success' : 'error'}`}>
               {errorMessage}
             </div>
-          )}
+          ) : serverStatus === 'online' && !appState.isRecording ? (
+            <div className="status-message success">Server is online. Ready to record.</div>
+          ) : null}
         </div>
 
         {/* Transcription (73%) */}

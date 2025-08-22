@@ -78,19 +78,59 @@ body {
     accent-color: #ccc;
 }
 
+.record-button:disabled {
+  background: #bdc3c7;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
 
 /* Notification Section - 7% */
 .notification-section {
-    height: 7%;
-    padding: 0 16px;
+    height: 10%; /* Increased height */
+    padding: 12px 16px;
     display: flex;
-    align-items: center;
-    justify-content: flex-start;
+    flex-direction: column; /* Changed to column */
+    align-items: flex-start; /* Align items to the start */
+    justify-content: center; /* Center vertically */
+    gap: 8px; /* Added gap between header and message */
+    border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.status-header {
+  font-size: 14px;
+  font-weight: 600;
+  color: #4a5568;
+  padding: 2px 8px;
+  border: 1px solid #cbd5e0;
+  border-radius: 6px;
+  background-color: #f7fafc;
+}
+
+.status-message {
+  width: 100%;
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.status-message.error {
+  background-color: #ffe6e6;
+  border: 1px solid #ffb3b3;
+  color: #cc0000;
+}
+
+.status-message.success {
+  background-color: #e6ffe6;
+  border: 1px solid #b3ffb3;
+  color: #006600;
 }
 
 /* Transcription Section - 73% */
 .transcription-section {
-    height: 73%;
+    height: 70%; /* Adjusted height */
     padding: 16px;
     display: flex;
     flex-direction: column;
