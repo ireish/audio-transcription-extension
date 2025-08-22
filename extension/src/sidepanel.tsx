@@ -39,25 +39,32 @@ const SidePanel: React.FC = () => {
   const transcriptionBoxRef = useRef<HTMLDivElement>(null)
   const appStateRef = useRef(appState);
   appStateRef.current = appState;
-
+  const pendingSessionTitleRef = useRef<string | null>(null);
+  
   const BACKEND_WS_URL = 'ws://localhost:3001/stream'
   const BACKEND_HTTP_URL = 'http://localhost:3001/upload'
   
-  // Check server status on component mount
-  useEffect(() => {
-    const checkServerStatus = async () => {
-      try {
-        const response = await fetch(`${BACKEND_HTTP_URL.replace('/upload', '')}/health`);
-        if (response.ok) {
-          setServerStatus('online');
-        } else {
-          setServerStatus('offline');
-        }
-      } catch (error) {
+  const checkServerStatus = async () => {
+    try {
+      const response = await fetch(`${BACKEND_HTTP_URL.replace('/upload', '')}/health`);
+      if (response.ok) {
+        setServerStatus('online');
+        return true;
+      } else {
         setServerStatus('offline');
+        return false;
       }
-    };
-    checkServerStatus();
+    } catch (error) {
+      setServerStatus('offline');
+      return false;
+    }
+  };
+  
+  // Check server status periodically
+  useEffect(() => {
+    checkServerStatus(); // Initial check
+    const intervalId = setInterval(checkServerStatus, 5000); // Check every 5 seconds
+    return () => clearInterval(intervalId); // Cleanup on unmount
   }, []);
 
   // Load state from storage on component mount
@@ -99,6 +106,9 @@ const SidePanel: React.FC = () => {
         const { transcript, isFinal } = message.data
         if (isFinal) {
           setAppState(prev => {
+            // Guard against updates before session is officially started
+            if (prev.activeSessionIndex === null) return prev;
+
             const textToProcess = prev.currentText + transcript + ' '
             const words = textToProcess.split(/\s+/).filter(Boolean)
             
@@ -128,18 +138,65 @@ const SidePanel: React.FC = () => {
         }
       } else if (message.type === 'OFFSCREEN_FAILURE') {
         showMessage(message.error || 'An unknown error occurred during recording.');
-        stopTimer();
+        setAppState(prev => ({ ...prev, isRecording: false, activeSessionIndex: null }));
+      } else if (message.type === 'CONNECTION_LOST') {
+        showMessage(message.error || 'Connection to the server was lost.');
+        setAppState(prev => ({ ...prev, isRecording: false, activeSessionIndex: null, elapsedMs: 0 }));
+        setServerStatus('offline');
+      } else if (message.type === 'RECORDING_STARTED') {
         setAppState(prev => {
-          if (prev.activeSessionIndex === null) return { ...prev, isRecording: false };
-          const newSessions = [...prev.sessions];
-          newSessions.splice(prev.activeSessionIndex, 1);
-          return { ...prev, isRecording: false, activeSessionIndex: null, sessions: newSessions };
+          if (!pendingSessionTitleRef.current) return prev; // Should not happen
+
+          const newSession = { title: pendingSessionTitleRef.current, lines: [] };
+          pendingSessionTitleRef.current = null;
+          
+          const { currentText, activeSessionIndex, sessions } = prev;
+          let newSessions = sessions;
+
+          // Flush text from a PREVIOUS session before starting a new one.
+          if (currentText.trim() && activeSessionIndex !== null && activeSessionIndex < sessions.length) {
+            newSessions = [...sessions];
+            const sessionToUpdate = { ...newSessions[activeSessionIndex] };
+            sessionToUpdate.lines = [...sessionToUpdate.lines, { text: currentText.trim(), timestamp: lineStartTimeRef.current! }];
+            newSessions[activeSessionIndex] = sessionToUpdate;
+          }
+
+          const sessionsWithNew = [...newSessions, newSession];
+
+          return {
+            ...prev,
+            sessions: sessionsWithNew,
+            isRecording: true,
+            activeSessionIndex: sessionsWithNew.length - 1,
+            currentText: '',
+          };
         });
       }
     }
     chrome.runtime.onMessage.addListener(messageListener)
     return () => chrome.runtime.onMessage.removeListener(messageListener)
   }, [])
+
+  // Start/Stop timer based on recording state
+  useEffect(() => {
+    if (appState.isRecording) {
+      const startTime = Date.now() - appState.elapsedMs;
+      timerRef.current = window.setInterval(() => {
+        setAppState(prev => ({ ...prev, elapsedMs: Date.now() - startTime }));
+      }, 1000);
+    } else {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+    }
+    return () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+    };
+  }, [appState.isRecording]);
 
   // Effect for auto-scrolling the transcription box
   useEffect(() => {
@@ -163,81 +220,67 @@ const SidePanel: React.FC = () => {
     return `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`
   }
 
-  const startTimer = () => {
-    const startTime = Date.now() - appState.elapsedMs;
-    timerRef.current = window.setInterval(() => {
-      setAppState(prev => ({...prev, elapsedMs: Date.now() - startTime }));
-    }, 1000)
-  }
-
-  const stopTimer = () => {
-    if (timerRef.current) {
-      window.clearInterval(timerRef.current)
-      timerRef.current = null
-    }
-  }
-
-  const flushCurrentText = () => {
-    const { currentText, activeSessionIndex, sessions } = appStateRef.current;
-    if (currentText.trim() && activeSessionIndex !== null && activeSessionIndex < sessions.length) {
-      const newSessions = [...sessions];
-      const sessionToUpdate = { ...newSessions[activeSessionIndex] };
-      sessionToUpdate.lines = [...sessionToUpdate.lines, { text: currentText.trim(), timestamp: lineStartTimeRef.current! }];
-      newSessions[activeSessionIndex] = sessionToUpdate;
-      setAppState(prev => ({ ...prev, sessions: newSessions, currentText: '' }));
-    }
-  }
-
-  const startTranscription = async () => {
-    flushCurrentText();
-    try {
-      setErrorMessage(null)
-      setInterimText('')
-      lineStartTimeRef.current = new Date().toISOString()
-
-      const response = await chrome.runtime.sendMessage({
-        type: 'OFFSCREEN_START',
-        backend: { wsUrl: BACKEND_WS_URL, httpUrl: BACKEND_HTTP_URL }
-      });
-
-      if (response && !response.ok) {
-        throw new Error(response.error || 'Failed to start recording')
-      }
-      if (response.title) {
-        const newSession = { title: response.title, lines: [] };
-        setAppState(prev => {
-          const newSessions = [...prev.sessions, newSession];
-          return {
-            ...prev,
-            sessions: newSessions,
-            isRecording: true,
-            activeSessionIndex: newSessions.length - 1
-          };
-        });
-      }
-    } catch (e: any) {
-      console.error('Failed to start transcription', e)
-      showMessage(e?.message || 'Failed to start recording')
-    }
-  }
-
-  const stopTranscription = () => {
-    flushCurrentText();
-    try {
-      chrome.runtime.sendMessage({ target: 'offscreen', type: 'STOP' });
-    } catch {}
-  }
-
-  const toggleRecording = () => {
+  const toggleRecording = async () => {
     if (appState.isRecording) {
-      stopTimer()
-      stopTranscription()
-      setAppState(prev => ({ ...prev, isRecording: false, activeSessionIndex: null }));
+      // STOP RECORDING
+      try {
+        chrome.runtime.sendMessage({ target: 'offscreen', type: 'STOP' });
+      } catch {}
+
+      setAppState(prev => {
+        const { currentText, activeSessionIndex, sessions } = prev;
+        let newSessions = sessions;
+
+        // Flush any remaining text to the active session
+        if (currentText.trim() && activeSessionIndex !== null && activeSessionIndex < sessions.length) {
+          newSessions = [...sessions];
+          const sessionToUpdate = { ...newSessions[activeSessionIndex] };
+          sessionToUpdate.lines = [...sessionToUpdate.lines, { text: currentText.trim(), timestamp: lineStartTimeRef.current! }];
+          newSessions[activeSessionIndex] = sessionToUpdate;
+        }
+        
+        return {
+          ...prev,
+          sessions: newSessions,
+          isRecording: false,
+          activeSessionIndex: null,
+          currentText: '',
+          elapsedMs: 0,
+        };
+      });
     } else {
-      startTimer()
-      startTranscription()
+      // START RECORDING
+      const isServerOnline = await checkServerStatus();
+      if (!isServerOnline) {
+        showMessage('Cannot start recording. Backend server is offline.');
+        return;
+      }
+      
+      try {
+        setErrorMessage(null);
+        setInterimText('');
+        lineStartTimeRef.current = new Date().toISOString();
+
+        const response = await chrome.runtime.sendMessage({
+          type: 'OFFSCREEN_START',
+          backend: { wsUrl: BACKEND_WS_URL, httpUrl: BACKEND_HTTP_URL }
+        });
+
+        if (response && !response.ok) {
+          throw new Error(response.error || 'Failed to start recording');
+        }
+
+        if (response.title) {
+          // Don't update state yet. Wait for confirmation.
+          pendingSessionTitleRef.current = response.title;
+        }
+      } catch (e: any) {
+        console.error('Failed to start transcription', e);
+        showMessage(e?.message || 'Failed to start recording');
+        setAppState(prev => ({ ...prev, isRecording: false }));
+      }
     }
-  }
+  };
 
   const generateTranscriptionText = (includeTimestamps = true) => {
     let fullText = appState.sessions.map(session => {
@@ -316,8 +359,9 @@ const SidePanel: React.FC = () => {
   }
 
   const clearAll = () => {
-    stopTimer();
-    stopTranscription();
+    try {
+      chrome.runtime.sendMessage({ target: 'offscreen', type: 'STOP' });
+    } catch {}
     setAppState({
       sessions: [],
       isRecording: false,

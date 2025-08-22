@@ -52,6 +52,9 @@ function openWs(url: string): Promise<WebSocket> {
       }, 8000)
       socket.onopen = () => { clearTimeout(timeout as any); resolve(socket) }
       socket.onerror = () => { clearTimeout(timeout as any); reject(new Error('WS error')) }
+      socket.onclose = () => {
+        chrome.runtime.sendMessage({ type: 'CONNECTION_LOST', error: 'Connection to server lost.' });
+      };
       socket.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data)
@@ -81,7 +84,9 @@ async function onPcmFrame(frame: Float32Array) {
     try {
       ws.send(floatTo16BitPCM(frame))
       return
-    } catch {}
+    } catch {
+      chrome.runtime.sendMessage({ type: 'CONNECTION_LOST', error: 'Connection to server lost.' });
+    }
   }
   // fallback to http batching
   pendingBuffers.push(frame)
@@ -102,7 +107,7 @@ function scheduleHttpFlush() {
       const body = floatTo16BitPCM(merged)
       await fetch(currentBackend.httpUrl, { method: 'POST', body })
     } catch (e) {
-      // swallow
+      chrome.runtime.sendMessage({ type: 'CONNECTION_LOST', error: 'Could not reach server.' });
     } finally {
       if (httpFlushTimer) { clearTimeout(httpFlushTimer); httpFlushTimer = null }
     }
@@ -145,6 +150,7 @@ async function startCaptureAndStream(backend: { wsUrl: string, httpUrl: string }
   mediaSource.connect(workletNode!)
   // To send audio back to speakers
   mediaSource.connect(audioContext!.destination);
+  chrome.runtime.sendMessage({ type: 'RECORDING_STARTED' });
 }
 
 function stopAll() {
@@ -154,7 +160,12 @@ function stopAll() {
   mediaSource = null
   try { mediaStream?.getTracks().forEach(t => t.stop()) } catch {}
   mediaStream = null
-  try { ws?.close() } catch {}
+  try { 
+    if (ws) {
+      ws.onclose = null; // Prevent firing the 'connection lost' event on purpose
+      ws.close()
+    }
+  } catch {}
   ws = null
   pendingBuffers = []
   if (httpFlushTimer) { clearTimeout(httpFlushTimer); httpFlushTimer = null }
