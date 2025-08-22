@@ -1,4 +1,5 @@
 import { v1p1beta1 as speech } from '@google-cloud/speech'
+import * as readline from 'readline'
 
 const encoding: 'LINEAR16' = 'LINEAR16'
 const sampleRateHertz = 16000
@@ -90,11 +91,17 @@ export class SpeechService {
       : ''
 
     if (stream.results[0].isFinal) {
+      // Clear the line of interim results and print the final one
+      readline.clearLine(process.stdout, 0)
+      readline.cursorTo(process.stdout, 0)
       console.log(`[${correctedTime}ms] Final: ${transcript}`)
       this.isFinalEndTime = this.resultEndTime
       this.lastTranscriptWasFinal = true
     } else {
-      process.stdout.write(`\r[${correctedTime}ms] Interim: ${transcript}`)
+      // Overwrite the current line with the latest interim result
+      readline.clearLine(process.stdout, 0)
+      readline.cursorTo(process.stdout, 0)
+      process.stdout.write(`[${correctedTime}ms] Interim: ${transcript}`)
       this.lastTranscriptWasFinal = false
     }
   }
