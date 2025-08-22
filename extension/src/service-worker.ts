@@ -9,19 +9,23 @@ chrome.action.onClicked.addListener((tab) => {
 
 let pendingOffscreenMessage: any = null;
 
-async function createOffscreenDocument() {
+async function hasOffscreenDocument() {
+  const offscreenUrl = chrome.runtime.getURL('offscreen.html');
   const existingContexts = await chrome.runtime.getContexts({
     contextTypes: ['OFFSCREEN_DOCUMENT'],
-    documentUrls: [chrome.runtime.getURL('offscreen.html')],
+    documentUrls: [offscreenUrl],
   });
-  if (existingContexts.length > 0) {
-    return;
+  return existingContexts.length > 0;
+}
+
+async function createOffscreenDocument() {
+  if (!(await hasOffscreenDocument())) {
+    await chrome.offscreen.createDocument({
+      url: 'offscreen.html',
+      reasons: ['AUDIO_PLAYBACK'],
+      justification: 'Audio processing for transcription',
+    });
   }
-  await chrome.offscreen.createDocument({
-    url: 'offscreen.html',
-    reasons: ['AUDIO_PLAYBACK'],
-    justification: 'Audio processing for transcription',
-  });
 }
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
@@ -29,8 +33,11 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     // Handles the "I'm ready" message from the offscreen document
     if (message.type === 'OFFSCREEN_READY') {
       if (pendingOffscreenMessage) {
-        await chrome.runtime.sendMessage(pendingOffscreenMessage);
-        pendingOffscreenMessage = null;
+        try {
+          await chrome.runtime.sendMessage(pendingOffscreenMessage);
+        } finally {
+          pendingOffscreenMessage = null;
+        }
       }
       sendResponse(true);
       return;
@@ -63,16 +70,20 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         return;
       }
 
-      // Store the command and create the document. The command will be sent
-      // once the document confirms it's ready.
-      pendingOffscreenMessage = {
+      const startMessage = {
         target: 'offscreen',
         type: 'START',
         backend: message.backend,
         streamId: streamId,
       };
 
-      await createOffscreenDocument();
+      if (await hasOffscreenDocument()) {
+        chrome.runtime.sendMessage(startMessage);
+      } else {
+        pendingOffscreenMessage = startMessage;
+        await createOffscreenDocument();
+      }
+      
       sendResponse({ ok: true, title: tab.title });
     }
   })();

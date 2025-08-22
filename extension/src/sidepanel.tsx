@@ -12,29 +12,76 @@ interface TranscriptionSession {
   lines: TranscriptionLine[]
 }
 
+interface AppState {
+  sessions: TranscriptionSession[];
+  isRecording: boolean;
+  activeSessionIndex: number | null;
+  currentText: string;
+  elapsedMs: number;
+}
+
 const SidePanel: React.FC = () => {
-  const [isRecording, setIsRecording] = useState(false)
-  const [sessions, setSessions] = useState<TranscriptionSession[]>([])
-  const [currentText, setCurrentText] = useState('')
+  const [appState, setAppState] = useState<AppState>({
+    sessions: [],
+    isRecording: false,
+    activeSessionIndex: null,
+    currentText: '',
+    elapsedMs: 0,
+  });
   const [interimText, setInterimText] = useState('')
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [errorType, setErrorType] = useState<'success' | 'error'>('error')
-  const [elapsedMs, setElapsedMs] = useState(0)
-  const startTimeRef = useRef<number | null>(null)
+  const [isStateLoaded, setIsStateLoaded] = useState(false)
+  
   const timerRef = useRef<number | null>(null)
   const lineStartTimeRef = useRef<string | null>(null)
-  const mediaStreamRef = useRef<MediaStream | null>(null)
   const transcriptionBoxRef = useRef<HTMLDivElement>(null)
+  const appStateRef = useRef(appState);
+  appStateRef.current = appState;
+
   const BACKEND_WS_URL = 'ws://localhost:3001/stream'
   const BACKEND_HTTP_URL = 'http://localhost:3001/upload'
+  
+  // Load state from storage on component mount
+  useEffect(() => {
+    chrome.storage.local.get('appState', (result) => {
+      if (result.appState) {
+        setAppState(result.appState)
+      }
+      setIsStateLoaded(true)
+    })
+  }, [])
 
+  // Save state to storage whenever it changes
+  useEffect(() => {
+    if (isStateLoaded) {
+      chrome.storage.local.set({ appState })
+    }
+  }, [appState, isStateLoaded])
+
+  // Listen for changes from other tabs/windows to keep state in sync
+  useEffect(() => {
+    const handleStorageChange = (changes: { [key: string]: chrome.storage.StorageChange }, areaName: string) => {
+      if (areaName === 'local' && changes.appState) {
+        if (JSON.stringify(changes.appState.newValue) !== JSON.stringify(appStateRef.current)) {
+          setAppState(changes.appState.newValue);
+        }
+      }
+    };
+    chrome.storage.onChanged.addListener(handleStorageChange);
+    return () => {
+      chrome.storage.onChanged.removeListener(handleStorageChange);
+    };
+  }, []);
+
+  // Message listener for transcription updates
   useEffect(() => {
     const messageListener = (message: any) => {
       if (message.type === 'TRANSCRIPTION_UPDATE') {
         const { transcript, isFinal } = message.data
         if (isFinal) {
-          setCurrentText(prev => {
-            const textToProcess = prev + transcript + ' '
+          setAppState(prev => {
+            const textToProcess = prev.currentText + transcript + ' '
             const words = textToProcess.split(/\s+/).filter(Boolean)
             
             const newLines: TranscriptionLine[] = []
@@ -46,40 +93,42 @@ const SidePanel: React.FC = () => {
               })
               lineStartTimeRef.current = new Date().toISOString()
             }
-            if (newLines.length > 0) {
-              setSessions(prevSessions => {
-                if (prevSessions.length === 0) return prevSessions
-                const lastSession = prevSessions[prevSessions.length - 1]
-                const updatedLines = [...lastSession.lines, ...newLines]
-                const updatedSession = { ...lastSession, lines: updatedLines }
-                return [...prevSessions.slice(0, -1), updatedSession]
-              })
+
+            let newSessions = prev.sessions;
+            if (newLines.length > 0 && prev.activeSessionIndex !== null && prev.activeSessionIndex < prev.sessions.length) {
+              newSessions = [...prev.sessions];
+              const sessionToUpdate = { ...newSessions[prev.activeSessionIndex] };
+              sessionToUpdate.lines = [...sessionToUpdate.lines, ...newLines];
+              newSessions[prev.activeSessionIndex] = sessionToUpdate;
             }
-            return words.join(' ') + ' '
+
+            return { ...prev, sessions: newSessions, currentText: words.join(' ') + ' ' };
           })
           setInterimText('')
         } else {
           setInterimText(transcript)
         }
+      } else if (message.type === 'OFFSCREEN_FAILURE') {
+        showMessage(message.error || 'An unknown error occurred during recording.');
+        stopTimer();
+        setAppState(prev => {
+          if (prev.activeSessionIndex === null) return { ...prev, isRecording: false };
+          const newSessions = [...prev.sessions];
+          newSessions.splice(prev.activeSessionIndex, 1);
+          return { ...prev, isRecording: false, activeSessionIndex: null, sessions: newSessions };
+        });
       }
     }
-
     chrome.runtime.onMessage.addListener(messageListener)
-
-    return () => {
-      chrome.runtime.onMessage.removeListener(messageListener)
-      if (timerRef.current) {
-        window.clearInterval(timerRef.current)
-        timerRef.current = null
-      }
-    }
+    return () => chrome.runtime.onMessage.removeListener(messageListener)
   }, [])
 
+  // Effect for auto-scrolling the transcription box
   useEffect(() => {
     if (transcriptionBoxRef.current) {
       transcriptionBoxRef.current.scrollTop = transcriptionBoxRef.current.scrollHeight
     }
-  }, [sessions, currentText, interimText])
+  }, [appState.sessions, appState.currentText, interimText])
 
   const showMessage = (message: string, type: 'success' | 'error' = 'error') => {
     setErrorType(type)
@@ -97,11 +146,9 @@ const SidePanel: React.FC = () => {
   }
 
   const startTimer = () => {
-    startTimeRef.current = Date.now()
+    const startTime = Date.now() - appState.elapsedMs;
     timerRef.current = window.setInterval(() => {
-      if (startTimeRef.current) {
-        setElapsedMs(Date.now() - startTimeRef.current)
-      }
+      setAppState(prev => ({...prev, elapsedMs: Date.now() - startTime }));
     }, 1000)
   }
 
@@ -110,30 +157,26 @@ const SidePanel: React.FC = () => {
       window.clearInterval(timerRef.current)
       timerRef.current = null
     }
-    if (currentText.trim()) {
-      setSessions(prev => {
-        if (prev.length === 0) return prev
-        const lastSession = prev[prev.length - 1]
-        const updatedLines = [...lastSession.lines, { text: currentText.trim(), timestamp: lineStartTimeRef.current! }]
-        const updatedSession = { ...lastSession, lines: updatedLines }
-        return [...prev.slice(0, -1), updatedSession]
-      })
-      setCurrentText('')
+  }
+
+  const flushCurrentText = () => {
+    const { currentText, activeSessionIndex, sessions } = appStateRef.current;
+    if (currentText.trim() && activeSessionIndex !== null && activeSessionIndex < sessions.length) {
+      const newSessions = [...sessions];
+      const sessionToUpdate = { ...newSessions[activeSessionIndex] };
+      sessionToUpdate.lines = [...sessionToUpdate.lines, { text: currentText.trim(), timestamp: lineStartTimeRef.current! }];
+      newSessions[activeSessionIndex] = sessionToUpdate;
+      setAppState(prev => ({ ...prev, sessions: newSessions, currentText: '' }));
     }
   }
 
-  // If needed in future: function to reset the timer
-
-  // No longer needed here: WS/MediaRecorder handled by offscreen document
-
   const startTranscription = async () => {
+    flushCurrentText();
     try {
       setErrorMessage(null)
-      setCurrentText('')
       setInterimText('')
       lineStartTimeRef.current = new Date().toISOString()
 
-      // Ask service worker to ensure offscreen and start
       const response = await chrome.runtime.sendMessage({
         type: 'OFFSCREEN_START',
         backend: { wsUrl: BACKEND_WS_URL, httpUrl: BACKEND_HTTP_URL }
@@ -143,35 +186,43 @@ const SidePanel: React.FC = () => {
         throw new Error(response.error || 'Failed to start recording')
       }
       if (response.title) {
-        setSessions(prev => [...prev, { title: response.title, lines: [] }])
+        const newSession = { title: response.title, lines: [] };
+        setAppState(prev => {
+          const newSessions = [...prev.sessions, newSession];
+          return {
+            ...prev,
+            sessions: newSessions,
+            isRecording: true,
+            activeSessionIndex: newSessions.length - 1
+          };
+        });
       }
     } catch (e: any) {
       console.error('Failed to start transcription', e)
       showMessage(e?.message || 'Failed to start recording')
-      try { mediaStreamRef.current?.getTracks().forEach(t => t.stop()) } catch {}
     }
   }
 
   const stopTranscription = () => {
+    flushCurrentText();
     try {
       chrome.runtime.sendMessage({ target: 'offscreen', type: 'STOP' });
     } catch {}
   }
 
   const toggleRecording = () => {
-    const next = !isRecording
-    setIsRecording(next)
-    if (next) {
-      startTimer()
-      startTranscription()
-    } else {
+    if (appState.isRecording) {
       stopTimer()
       stopTranscription()
+      setAppState(prev => ({ ...prev, isRecording: false, activeSessionIndex: null }));
+    } else {
+      startTimer()
+      startTranscription()
     }
   }
 
   const generateTranscriptionText = (includeTimestamps = true) => {
-    let fullText = sessions.map(session => {
+    let fullText = appState.sessions.map(session => {
       const sessionTitle = `\n--- ${session.title} ---\n`;
       const sessionLines = session.lines
         .map(line => {
@@ -185,9 +236,9 @@ const SidePanel: React.FC = () => {
       return sessionTitle + sessionLines
     }).join('\n')
 
-    if (currentText.trim()) {
+    if (appState.currentText.trim()) {
       const time = `[${new Date(lineStartTimeRef.current!).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}]`
-      const currentLine = includeTimestamps ? `${time} ${currentText.trim()}` : currentText.trim()
+      const currentLine = includeTimestamps ? `${time} ${appState.currentText.trim()}` : appState.currentText.trim()
       fullText += `\n${currentLine}`
     }
     return fullText.trim()
@@ -233,7 +284,7 @@ const SidePanel: React.FC = () => {
     const data = {
       transcription: textToDownload,
       timestamp: new Date().toISOString(),
-      duration: formatTime(elapsedMs),
+      duration: formatTime(appState.elapsedMs),
     }
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
     const url = URL.createObjectURL(blob)
@@ -247,12 +298,16 @@ const SidePanel: React.FC = () => {
   }
 
   const clearAll = () => {
-    setSessions([])
-    setCurrentText('')
-    setInterimText('')
-    if (!isRecording) {
-      setElapsedMs(0)
-    }
+    stopTimer();
+    stopTranscription();
+    setAppState({
+      sessions: [],
+      isRecording: false,
+      activeSessionIndex: null,
+      currentText: '',
+      elapsedMs: 0,
+    });
+    setInterimText('');
   }
 
   return (
@@ -262,9 +317,9 @@ const SidePanel: React.FC = () => {
         <div className="recording-section">
           <button
             onClick={toggleRecording}
-            className={`record-button ${isRecording ? 'recording' : ''}`}
+            className={`record-button ${appState.isRecording ? 'recording' : ''}`}
           >
-            {isRecording ? 'Stop Recording' : 'Start Recording'}
+            {appState.isRecording ? 'Stop Recording' : 'Start Recording'}
           </button>
           <label className="mic-checkbox">
             <input
@@ -301,11 +356,11 @@ const SidePanel: React.FC = () => {
             </div>
           </div>
           <div className="transcription-box" id="transcriptionBox" ref={transcriptionBoxRef}>
-            {isRecording && sessions.length === 0 && currentText.length === 0 && interimText.length === 0 ? (
+            {appState.isRecording && appState.sessions.length === 0 && appState.currentText.length === 0 && interimText.length === 0 ? (
               <div style={{ color: '#667eea', fontStyle: 'italic' }}>🔴 Recording... Listening for audio input...</div>
             ) : (
               <>
-                {sessions.map((session, sessionIndex) => (
+                {appState.sessions.map((session, sessionIndex) => (
                   <div key={sessionIndex}>
                     <div className="session-title">{session.title}</div>
                     {session.lines.map((line, lineIndex) => (
@@ -318,14 +373,18 @@ const SidePanel: React.FC = () => {
                     ))}
                   </div>
                 ))}
-                <div className="transcription-line">
-                  {isRecording && sessions.length > 0 && <span className="timestamp">
-                    [{new Date(lineStartTimeRef.current!).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}]
-                  </span>}
-                  <span>{currentText}</span>
-                  {interimText && <span className="interim-text">{interimText}</span>}
-                </div>
-                {sessions.length === 0 && currentText.length === 0 && interimText.length === 0 && (
+                {(appState.currentText || interimText) && (
+                  <div className="transcription-line">
+                    {appState.isRecording && (
+                      <span className="timestamp">
+                        [{new Date(lineStartTimeRef.current || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}]
+                      </span>
+                    )}
+                    <span>{appState.currentText}</span>
+                    {interimText && <span className="interim-text">{interimText}</span>}
+                  </div>
+                )}
+                {appState.sessions.length === 0 && appState.currentText.length === 0 && interimText.length === 0 && (
                   <div className="transcription-placeholder">
                     Click the record button to start transcribing audio...
                   </div>
@@ -338,7 +397,7 @@ const SidePanel: React.FC = () => {
         {/* Timer (10%) */}
         <div className="timer-section">
           <span className="timer-title">Session time: </span>
-          <div className="timer" id="timer">{formatTime(elapsedMs)}</div>
+          <div className="timer" id="timer">{formatTime(appState.elapsedMs)}</div>
           <button className="action-btn" onClick={clearAll} style={{ marginLeft: '10px' }}>Clear Transcripts</button>
         </div>
       </div>

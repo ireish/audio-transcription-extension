@@ -167,13 +167,17 @@ chrome.runtime.onMessage.addListener((message) => {
   switch (message.type) {
     case 'START':
       startCaptureAndStream(message.backend, message.streamId).catch((e) => {
-          // 🛠️ IMPROVE THIS ERROR LOG 🛠️
-          // This will now print the specific error name and message.
           if (e instanceof DOMException) {
             console.error(`Offscreen start failed: ${e.name} - ${e.message}`);
           } else {
             console.error('Offscreen start failed', e);
           }
+          const errorMessage = e instanceof Error ? `${e.name}: ${e.message}` : String(e);
+          // NEW: Send failure message back to the UI
+          chrome.runtime.sendMessage({
+            type: 'OFFSCREEN_FAILURE',
+            error: `Capture failed: ${errorMessage}`
+          });
         }
       );
       break;
