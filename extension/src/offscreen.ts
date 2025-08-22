@@ -2,6 +2,8 @@
 // 16 kHz mono PCM, transports frames via WS or chunked POST. Controlled via
 // chrome.runtime messages from the side panel.
 
+import { floatTo16BitPCM } from './utils/audio';
+
 let audioContext: AudioContext | null = null
 let ws: WebSocket | null = null
 let transportMode: 'ws' | 'http' = 'ws'
@@ -67,16 +69,6 @@ function openWs(url: string): Promise<WebSocket> {
       reject(e)
     }
   })
-}
-
-function floatTo16BitPCM(float32: Float32Array): ArrayBuffer {
-  const buffer = new ArrayBuffer(float32.length * 2)
-  const view = new DataView(buffer)
-  for (let i = 0; i < float32.length; i++) {
-    let s = Math.max(-1, Math.min(1, float32[i]))
-    view.setInt16(i * 2, s < 0 ? s * 0x8000 : s * 0x7fff, true)
-  }
-  return buffer
 }
 
 async function onPcmFrame(frame: Float32Array) {
@@ -163,7 +155,9 @@ function stopAll() {
   try { 
     if (ws) {
       ws.onclose = null; // Prevent firing the 'connection lost' event on purpose
-      ws.close()
+      setTimeout(() => {
+        ws?.close()
+      }, 500);
     }
   } catch {}
   ws = null

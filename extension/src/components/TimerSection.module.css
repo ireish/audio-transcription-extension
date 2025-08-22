@@ -1,0 +1,42 @@
+.timerSection {
+    height: 10%;
+    padding: 16px;
+    background: rgba(255, 255, 255, 0.9);
+    border-top: 1px solid rgba(0, 0, 0, 0.1);
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    align-items: center;
+}
+
+.timerTitle {
+    font-size: 16px;
+    font-weight: 600;
+    color: #555;
+}
+
+.timer {
+    font-size: 20px;
+    font-weight: 700;
+    color: #333;
+    font-family: 'Courier New', monospace;
+}
+
+.actionBtn {
+    padding: 6px 10px;
+    border: 2px solid #e1e5e9;
+    background: white;
+    border-radius: 6px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.actionBtn:hover {
+    border-color: #667eea;
+    color: #667eea;
+    background-color: #e2e8f0;
+}

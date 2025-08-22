@@ -1,24 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import './styles/sidepanel.css'
-
-interface TranscriptionLine {
-  text: string
-  timestamp: string
-}
-
-interface TranscriptionSession {
-  title: string
-  lines: TranscriptionLine[]
-}
-
-interface AppState {
-  sessions: TranscriptionSession[];
-  isRecording: boolean;
-  activeSessionIndex: number | null;
-  currentText: string;
-  elapsedMs: number;
-}
+import { formatTime } from './utils/time'
+import { checkServerStatus as checkServerStatusApi } from './utils/api'
+import RecordingSection from './components/RecordingSection'
+import NotificationSection from './components/NotificationSection'
+import TranscriptionSection from './components/TranscriptionSection'
+import TimerSection from './components/TimerSection'
+import type { AppState, TranscriptionLine } from './types'
 
 const SidePanel: React.FC = () => {
   const [appState, setAppState] = useState<AppState>({
@@ -36,28 +25,22 @@ const SidePanel: React.FC = () => {
   
   const timerRef = useRef<number | null>(null)
   const lineStartTimeRef = useRef<string | null>(null)
-  const transcriptionBoxRef = useRef<HTMLDivElement>(null)
+  const transcriptionBoxRef = useRef<HTMLDivElement | null>(null)
   const appStateRef = useRef(appState);
   appStateRef.current = appState;
   const pendingSessionTitleRef = useRef<string | null>(null);
   
-  const BACKEND_WS_URL = 'ws://localhost:3001/stream'
-  const BACKEND_HTTP_URL = 'http://localhost:3001/upload'
+  const BACKEND_WS_URL = import.meta.env.VITE_BACKEND_WS_URL || 'ws://localhost:3001/stream';
+  const BACKEND_HTTP_URL = import.meta.env.VITE_BACKEND_HTTP_URL || 'http://localhost:3001/upload';
   
   const checkServerStatus = async () => {
-    try {
-      const response = await fetch(`${BACKEND_HTTP_URL.replace('/upload', '')}/health`);
-      if (response.ok) {
-        setServerStatus('online');
-        return true;
-      } else {
-        setServerStatus('offline');
-        return false;
-      }
-    } catch (error) {
+    const isOnline = await checkServerStatusApi(BACKEND_HTTP_URL);
+    if (isOnline) {
+      setServerStatus('online');
+    } else {
       setServerStatus('offline');
-      return false;
     }
+    return isOnline;
   };
   
   // Check server status periodically
@@ -166,7 +149,6 @@ const SidePanel: React.FC = () => {
           return {
             ...prev,
             sessions: sessionsWithNew,
-            isRecording: true,
             activeSessionIndex: sessionsWithNew.length - 1,
             currentText: '',
           };
@@ -211,15 +193,6 @@ const SidePanel: React.FC = () => {
     window.setTimeout(() => setErrorMessage(null), 3000)
   }
 
-  const formatTime = (ms: number) => {
-    const totalSeconds = Math.floor(ms / 1000)
-    const hours = Math.floor(totalSeconds / 3600)
-    const minutes = Math.floor((totalSeconds % 3600) / 60)
-    const seconds = totalSeconds % 60
-    const pad = (n: number) => n.toString().padStart(2, '0')
-    return `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`
-  }
-
   const toggleRecording = async () => {
     if (appState.isRecording) {
       // STOP RECORDING
@@ -261,6 +234,9 @@ const SidePanel: React.FC = () => {
         setInterimText('');
         lineStartTimeRef.current = new Date().toISOString();
 
+        // Optimistically set recording state to fix timestamp race condition
+        setAppState(prev => ({ ...prev, isRecording: true, elapsedMs: 0 }));
+
         const response = await chrome.runtime.sendMessage({
           type: 'OFFSCREEN_START',
           backend: { wsUrl: BACKEND_WS_URL, httpUrl: BACKEND_HTTP_URL }
@@ -277,6 +253,7 @@ const SidePanel: React.FC = () => {
       } catch (e: any) {
         console.error('Failed to start transcription', e);
         showMessage(e?.message || 'Failed to start recording');
+        // Rollback optimistic state update on failure
         setAppState(prev => ({ ...prev, isRecording: false }));
       }
     }
@@ -375,95 +352,34 @@ const SidePanel: React.FC = () => {
   return (
     <div>
       <div className="container">
-        {/* Recording (10%) */}
-        <div className="recording-section">
-          <button
-            onClick={toggleRecording}
-            className={`record-button ${appState.isRecording ? 'recording' : ''}`}
-            disabled={serverStatus !== 'online'}
-          >
-            {appState.isRecording ? 'Stop Recording' : 'Start Recording'}
-          </button>
-          <label className="mic-checkbox">
-            <input
-              type="checkbox"
-              checked={false}
-              onChange={() => {}}
-              disabled
-            />
-            <span>Microphone</span>
-          </label>
-        </div>
+        <RecordingSection
+          isRecording={appState.isRecording}
+          serverStatus={serverStatus}
+          toggleRecording={toggleRecording}
+        />
 
-        {/* Notification Status (7%) */}
-        <div className="notification-section">
-          <h4 className="status-header">Status</h4>
-          {serverStatus === 'offline' ? (
-            <div className="status-message error">Server is offline. Please start the backend server.</div>
-          ) : errorMessage ? (
-            <div className={`status-message ${errorType === 'success' ? 'success' : 'error'}`}>
-              {errorMessage}
-            </div>
-          ) : serverStatus === 'online' && !appState.isRecording ? (
-            <div className="status-message success">Server is online. Ready to record.</div>
-          ) : null}
-        </div>
+        <NotificationSection
+          serverStatus={serverStatus}
+          errorMessage={errorMessage}
+          errorType={errorType}
+          isRecording={appState.isRecording}
+        />
 
-        {/* Transcription (73%) */}
-        <div className="transcription-section">
-          <div className="transcription-header">
-            <h3 className="transcription-title">Transcription</h3>
-            <div className="action-buttons">
-              <button className="action-btn" onClick={copyToClipboard}>📋 Copy</button>
-              <button className="action-btn" onClick={downloadText}>💾 TXT</button>
-              <button className="action-btn" onClick={downloadJson}>📄 JSON</button>
-            </div>
-          </div>
-          <div className="transcription-box" id="transcriptionBox" ref={transcriptionBoxRef}>
-            {appState.isRecording && appState.sessions.length === 0 && appState.currentText.length === 0 && interimText.length === 0 ? (
-              <div style={{ color: '#667eea', fontStyle: 'italic' }}>🔴 Recording... Listening for audio input...</div>
-            ) : (
-              <>
-                {appState.sessions.map((session, sessionIndex) => (
-                  <div key={sessionIndex}>
-                    <div className="session-title">{session.title}</div>
-                    {session.lines.map((line, lineIndex) => (
-                      <div key={lineIndex} className="transcription-line">
-                        <span className="timestamp">
-                          [{new Date(line.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}]
-                        </span>
-                        {line.text}
-                      </div>
-                    ))}
-                  </div>
-                ))}
-                {(appState.currentText || interimText) && (
-                  <div className="transcription-line">
-                    {appState.isRecording && (
-                      <span className="timestamp">
-                        [{new Date(lineStartTimeRef.current || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}]
-                      </span>
-                    )}
-                    <span>{appState.currentText}</span>
-                    {interimText && <span className="interim-text">{interimText}</span>}
-                  </div>
-                )}
-                {appState.sessions.length === 0 && appState.currentText.length === 0 && interimText.length === 0 && (
-                  <div className="transcription-placeholder">
-                    Click the record button to start transcribing audio...
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-        </div>
+        <TranscriptionSection
+          appState={appState}
+          interimText={interimText}
+          transcriptionBoxRef={transcriptionBoxRef}
+          lineStartTimeRef={lineStartTimeRef}
+          copyToClipboard={copyToClipboard}
+          downloadText={downloadText}
+          downloadJson={downloadJson}
+        />
 
-        {/* Timer (10%) */}
-        <div className="timer-section">
-          <span className="timer-title">Session time: </span>
-          <div className="timer" id="timer">{formatTime(appState.elapsedMs)}</div>
-          <button className="action-btn" onClick={clearAll} style={{ marginLeft: '10px' }}>Clear Transcripts</button>
-        </div>
+        <TimerSection
+          elapsedMs={appState.elapsedMs}
+          formatTime={formatTime}
+          clearAll={clearAll}
+        />
       </div>
     </div>
   )
