@@ -36,7 +36,11 @@ const wss = new WebSocketServer({ server, path: '/stream' })
 
 wss.on('connection', (socket: WebSocket) => {
   console.log('[WS] client connected')
-  const speechService = new SpeechService()
+  const speechService = new SpeechService((data) => {
+    if (socket.readyState === WebSocket.OPEN) {
+      socket.send(JSON.stringify(data));
+    }
+  })
   speechService.start()
 
   socket.on('message', (data: RawData, isBinary: boolean) => {

@@ -8,6 +8,11 @@ const languageCode = 'en-US'
 // We will restart the stream just before that.
 const streamingLimit = 290000 // ms ~ 4.8 minutes
 
+export interface TranscriptionData {
+  transcript: string
+  isFinal: boolean
+}
+
 export class SpeechService {
   private client: speech.SpeechClient
   private recognizeStream: any = null // TODO: Type it properly later
@@ -21,9 +26,11 @@ export class SpeechService {
   private bridgingOffset = 0
   private lastTranscriptWasFinal = false
   private restartTimer: NodeJS.Timeout | null = null
+  private onTranscription: (data: TranscriptionData) => void
 
-  constructor () {
+  constructor (onTranscription: (data: TranscriptionData) => void) {
     this.client = new speech.SpeechClient()
+    this.onTranscription = onTranscription
     this.startStream = this.startStream.bind(this)
     this.speechCallback = this.speechCallback.bind(this)
     this.restartStream = this.restartStream.bind(this)
@@ -95,6 +102,7 @@ export class SpeechService {
       readline.clearLine(process.stdout, 0)
       readline.cursorTo(process.stdout, 0)
       console.log(`[${correctedTime}ms] Final: ${transcript}`)
+      this.onTranscription({ transcript, isFinal: true })
       this.isFinalEndTime = this.resultEndTime
       this.lastTranscriptWasFinal = true
     } else {
@@ -102,6 +110,7 @@ export class SpeechService {
       readline.clearLine(process.stdout, 0)
       readline.cursorTo(process.stdout, 0)
       process.stdout.write(`[${correctedTime}ms] Interim: ${transcript}`)
+      this.onTranscription({ transcript, isFinal: false })
       this.lastTranscriptWasFinal = false
     }
   }

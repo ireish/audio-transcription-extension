@@ -52,6 +52,14 @@ function openWs(url: string): Promise<WebSocket> {
       }, 8000)
       socket.onopen = () => { clearTimeout(timeout as any); resolve(socket) }
       socket.onerror = () => { clearTimeout(timeout as any); reject(new Error('WS error')) }
+      socket.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data)
+          chrome.runtime.sendMessage({ type: 'TRANSCRIPTION_UPDATE', data });
+        } catch (e) {
+          console.error('Error parsing transcription data:', e)
+        }
+      }
     } catch (e) {
       reject(e)
     }

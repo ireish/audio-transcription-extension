@@ -3,10 +3,7 @@ import { createRoot } from 'react-dom/client'
 import './styles/sidepanel.css'
 
 const SidePanel: React.FC = () => {
-  const [apiKeyInput, setApiKeyInput] = useState('')
-  const [isConnected, setIsConnected] = useState(false)
   const [isRecording, setIsRecording] = useState(false)
-  const [isMicEnabled, setIsMicEnabled] = useState(true)
   const [transcriptionText, setTranscriptionText] = useState('')
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [errorType, setErrorType] = useState<'success' | 'error'>('error')
@@ -14,18 +11,28 @@ const SidePanel: React.FC = () => {
   const startTimeRef = useRef<number | null>(null)
   const timerRef = useRef<number | null>(null)
   const mediaStreamRef = useRef<MediaStream | null>(null)
+  const transcriptionBoxRef = useRef<HTMLDivElement>(null)
+  const finalTranscriptRef = useRef<string>('')
   const BACKEND_WS_URL = 'ws://localhost:3001/stream'
   const BACKEND_HTTP_URL = 'http://localhost:3001/upload'
 
-  // Load stored API key on mount
   useEffect(() => {
-    chrome.storage?.sync.get(['apiKey']).then((res) => {
-      const stored = res?.apiKey as string | undefined
-      if (stored && stored.length > 0) {
-        setIsConnected(true)
+    const messageListener = (message: any) => {
+      if (message.type === 'TRANSCRIPTION_UPDATE') {
+        const { transcript, isFinal } = message.data
+        if (isFinal) {
+          finalTranscriptRef.current += transcript + ' '
+          setTranscriptionText(finalTranscriptRef.current)
+        } else {
+          setTranscriptionText(finalTranscriptRef.current + transcript)
+        }
       }
-    }).catch(() => {})
+    }
+
+    chrome.runtime.onMessage.addListener(messageListener)
+
     return () => {
+      chrome.runtime.onMessage.removeListener(messageListener)
       if (timerRef.current) {
         window.clearInterval(timerRef.current)
         timerRef.current = null
@@ -33,26 +40,16 @@ const SidePanel: React.FC = () => {
     }
   }, [])
 
+  useEffect(() => {
+    if (transcriptionBoxRef.current) {
+      transcriptionBoxRef.current.scrollTop = transcriptionBoxRef.current.scrollHeight
+    }
+  }, [transcriptionText])
+
   const showMessage = (message: string, type: 'success' | 'error' = 'error') => {
     setErrorType(type)
     setErrorMessage(message)
     window.setTimeout(() => setErrorMessage(null), 3000)
-  }
-
-  const saveApiKey = async () => {
-    const value = apiKeyInput.trim()
-    if (!value) {
-      showMessage('Please enter a valid API key')
-      return
-    }
-    try {
-      await chrome.storage?.sync.set({ apiKey: value })
-      setIsConnected(true)
-      setApiKeyInput('')
-      showMessage('API Key saved successfully!', 'success')
-    } catch {
-      showMessage('Failed to save API key')
-    }
   }
 
   const formatTime = (ms: number) => {
@@ -112,14 +109,6 @@ const SidePanel: React.FC = () => {
   }
 
   const toggleRecording = () => {
-    if (!isConnected) {
-      showMessage('Please enter your API Key first')
-      return
-    }
-    if (!isMicEnabled) {
-      showMessage('Please enable microphone access')
-      return
-    }
     const next = !isRecording
     setIsRecording(next)
     if (next) {
@@ -184,44 +173,39 @@ const SidePanel: React.FC = () => {
   return (
     <div>
       <div className="container">
-        {/* API Key + Status (15%) */}
-        <div className="api-section">
-          <div className="api-input-row">
-            <input
-              type="password"
-              value={apiKeyInput}
-              onChange={(e) => setApiKeyInput(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter') saveApiKey() }}
-              placeholder="Enter Gemini API Key"
-              className="api-input"
-            />
-            <button onClick={saveApiKey} className="api-submit">Save</button>
-          </div>
-          <div className="connection-status">
-            <div className={`status-indicator ${isConnected ? 'connected' : 'disconnected'}`} />
-            <span>{isConnected ? 'Connected to Gemini API' : 'Disconnected'}</span>
-          </div>
-        </div>
-
-        {/* Recording (20%) */}
+        {/* Recording (10%) */}
         <div className="recording-section">
           <button
             onClick={toggleRecording}
             className={`record-button ${isRecording ? 'recording' : ''}`}
           >
-            {isRecording ? '⏹️' : '🎤'}
+            {isRecording ? 'Stop Recording' : 'Start Recording'}
           </button>
           <label className="mic-checkbox">
             <input
               type="checkbox"
-              checked={isMicEnabled}
-              onChange={(e) => setIsMicEnabled(e.target.checked)}
+              checked={false}
+              onChange={() => {}}
+              disabled
             />
             <span>Microphone</span>
           </label>
         </div>
 
-        {/* Transcription (55%) */}
+        {/* Notification Status (7%) */}
+        <div className="notification-section">
+          {errorMessage && (
+            <div className={`error-notification show`} style={{
+              background: errorType === 'success' ? '#e6ffe6' : '#ffe6e6',
+              borderColor: errorType === 'success' ? '#b3ffb3' : '#ffb3b3',
+              color: errorType === 'success' ? '#006600' : '#cc0000'
+            }}>
+              {errorMessage}
+            </div>
+          )}
+        </div>
+
+        {/* Transcription (73%) */}
         <div className="transcription-section">
           <div className="transcription-header">
             <h3 className="transcription-title">Transcription</h3>
@@ -231,7 +215,7 @@ const SidePanel: React.FC = () => {
               <button className="action-btn" onClick={downloadJson}>📄 JSON</button>
             </div>
           </div>
-          <div className="transcription-box" id="transcriptionBox">
+          <div className="transcription-box" id="transcriptionBox" ref={transcriptionBoxRef}>
             {isRecording && transcriptionText.length === 0 ? (
               <div style={{ color: '#667eea', fontStyle: 'italic' }}>🔴 Recording... Listening for audio input...</div>
             ) : (
@@ -244,16 +228,8 @@ const SidePanel: React.FC = () => {
 
         {/* Timer (10%) */}
         <div className="timer-section">
+          <span className="timer-title">Session time: </span>
           <div className="timer" id="timer">{formatTime(elapsedMs)}</div>
-          {errorMessage && (
-            <div className={`error-notification show`} style={{
-              background: errorType === 'success' ? '#e6ffe6' : '#ffe6e6',
-              borderColor: errorType === 'success' ? '#b3ffb3' : '#ffb3b3',
-              color: errorType === 'success' ? '#006600' : '#cc0000'
-            }}>
-              {errorMessage}
-            </div>
-          )}
         </div>
       </div>
     </div>

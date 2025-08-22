@@ -23,89 +23,35 @@ body {
     border-radius: 0;
 }
 
-/* API Key + Status Section - 15% */
-.api-section {
-    height: 15%;
-    padding: 12px 16px;
-    background: rgba(255, 255, 255, 0.9);
-    border-bottom: 1px solid rgba(0, 0, 0, 0.1);
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    justify-content: center;
-}
-
-.api-input-row {
-    display: flex;
-    gap: 8px;
-    align-items: center;
-}
-
-.api-input {
-    flex: 1;
-    padding: 8px 12px;
-    border: 2px solid #e1e5e9;
-    border-radius: 8px;
-    font-size: 13px;
-    transition: all 0.2s ease;
-    background: white;
-}
-
-.api-input:focus {
-    outline: none;
-    border-color: #667eea;
-    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-}
-
-.api-submit {
-    padding: 8px 14px;
-    background: #667eea;
-    color: white;
-    border: none;
-    border-radius: 8px;
-    font-size: 13px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.2s ease;
-}
-
-.api-submit:hover {
-    background: #5a6fd8;
-    transform: translateY(-1px);
-}
-
-/* Recording Section - 20% */
+/* Recording Section - 10% */
 .recording-section {
-    height: 20%;
+    height: 10%;
     padding: 16px;
     display: flex;
-    flex-direction: column;
-    justify-content: center;
+    flex-direction: row;
+    justify-content: flex-start;
     align-items: center;
-    gap: 12px;
+    gap: 16px;
     background: rgba(255, 255, 255, 0.8);
     border-bottom: 1px solid rgba(0, 0, 0, 0.1);
 }
 
 .record-button {
-    width: 80px;
-    height: 80px;
-    border-radius: 50%;
+    padding: 10px 20px;
+    border-radius: 8px;
     border: none;
-    background: linear-gradient(135deg, #ff6b6b, #ee5a24);
+    background: linear-gradient(135deg, #667eea, #764ba2);
     color: white;
-    font-size: 24px;
+    font-size: 16px;
+    font-weight: 600;
     cursor: pointer;
     transition: all 0.3s ease;
-    box-shadow: 0 4px 15px rgba(255, 107, 107, 0.3);
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.2);
 }
 
 .record-button:hover {
-    transform: scale(1.05);
-    box-shadow: 0 6px 20px rgba(255, 107, 107, 0.4);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(102, 126, 234, 0.3);
 }
 
 .record-button.recording {
@@ -127,15 +73,24 @@ body {
     color: #666;
 }
 
-.mic-checkbox input[type="checkbox"] {
-    width: 18px;
-    height: 18px;
-    accent-color: #667eea;
+.mic-checkbox input[type="checkbox"]:disabled {
+    cursor: not-allowed;
+    accent-color: #ccc;
 }
 
-/* Transcription Section - 55% */
+
+/* Notification Section - 7% */
+.notification-section {
+    height: 7%;
+    padding: 0 16px;
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+}
+
+/* Transcription Section - 73% */
 .transcription-section {
-    height: 55%;
+    height: 73%;
     padding: 16px;
     display: flex;
     flex-direction: column;
@@ -219,55 +174,35 @@ body {
     background: rgba(255, 255, 255, 0.9);
     border-top: 1px solid rgba(0, 0, 0, 0.1);
     display: flex;
-    flex-direction: column;
     gap: 8px;
     justify-content: center;
     align-items: center;
 }
 
-.connection-status {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 12px;
-}
-
-.status-indicator {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: #ddd;
-}
-
-.status-indicator.connected {
-    background: #2ed573;
-    box-shadow: 0 0 6px rgba(46, 213, 115, 0.6);
-}
-
-.status-indicator.disconnected {
-    background: #ff4757;
+.timer-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: #555;
 }
 
 .timer {
     font-size: 20px;
     font-weight: 700;
-    text-align: center;
     color: #333;
     font-family: 'Courier New', monospace;
 }
 
 .error-notification {
+    width: 100%;
     background: #ffe6e6;
     border: 1px solid #ffb3b3;
     border-radius: 8px;
     padding: 8px 12px;
     font-size: 12px;
     color: #cc0000;
-    display: none;
 }
 
 .error-notification.show {
-    display: block;
     animation: slideIn 0.3s ease;
 }
 
