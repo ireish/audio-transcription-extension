@@ -20,27 +20,21 @@ class PCM16kProcessor extends AudioWorkletProcessor {
     const channel = input[0]
     if (!channel) return true
 
-    // Simple decimation with linear interpolation to 16k
-    const out = []
-    for (let i = 0; i < channel.length; i++) {
-      const pos = this.phase + i
-      const targetIndex = pos / this.resampleRatio
-      const idx = Math.floor(targetIndex)
-      const frac = targetIndex - idx
-      const a = channel[idx] ?? channel[channel.length - 1]
-      const b = channel[idx + 1] ?? a
-      out.push(a + (b - a) * frac)
-    }
-    this.phase += channel.length
+    // Downsample by averaging groups of samples.
+    // This is a simple and effective way to resample.
+    const out = new Float32Array(Math.ceil(channel.length / this.resampleRatio))
 
-    // Downsample by taking every resampleRatio-th sample to approximate 16k
-    const stride = Math.max(1, Math.floor(this.resampleRatio))
-    const down = new Float32Array(Math.ceil(out.length / stride))
-    for (let i = 0, j = 0; i < out.length; i += stride, j++) {
-      down[j] = out[i]
+    for (let i = 0, j = 0; i < channel.length; j++) {
+      let sum = 0
+      let count = 0
+      for (let k = 0; k < this.resampleRatio && i < channel.length; k++, i++) {
+        sum += channel[i]
+        count++
+      }
+      out[j] = sum / count
     }
 
-    this.port.postMessage({ type: 'pcm', payload: down }, [down.buffer])
+    this.port.postMessage({ type: 'pcm', payload: out }, [out.buffer])
     return true
   }
 }

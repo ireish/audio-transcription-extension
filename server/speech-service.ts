@@ -41,7 +41,7 @@ export class SpeechService {
     }
     if (this.recognizeStream) {
       this.recognizeStream.end()
-      this.recognizeStream.removeListener('data', this.speechCallback)
+      this.recognizeStream.removeAllListeners()
       this.recognizeStream = null
     }
   }
@@ -65,6 +65,7 @@ export class SpeechService {
           this.restartStream()
         } else {
           console.error('API request error', err)
+          this.restartStream()
         }
       })
       .on('data', this.speechCallback)
@@ -138,7 +139,11 @@ export class SpeechService {
 
         for (let i = chunksFromMS; i < this.lastAudioInput.length; i++) {
           if (this.recognizeStream) {
-            this.recognizeStream.write(this.lastAudioInput[i])
+            try {
+              this.recognizeStream.write(this.lastAudioInput[i])
+            } catch (e) {
+              console.error('Error writing to stream:', e)
+            }
           }
         }
       }
@@ -148,7 +153,11 @@ export class SpeechService {
     this.audioInput.push(chunk)
 
     if (this.recognizeStream) {
-      this.recognizeStream.write(chunk)
+      try {
+        this.recognizeStream.write(chunk)
+      } catch (e) {
+        console.error('Error writing to stream:', e)
+      }
     }
   }
 }
