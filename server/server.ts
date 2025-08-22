@@ -1,6 +1,8 @@
+import 'dotenv/config'
 import express, { Request, Response } from 'express'
 import http from 'http'
 import { WebSocketServer, WebSocket, RawData } from 'ws'
+import { SpeechService } from './speech-service'
 
 const PORT = Number(process.env.PORT) || 3001
 
@@ -34,12 +36,13 @@ const wss = new WebSocketServer({ server, path: '/stream' })
 
 wss.on('connection', (socket: WebSocket) => {
   console.log('[WS] client connected')
+  const speechService = new SpeechService()
+  speechService.start()
+
   socket.on('message', (data: RawData, isBinary: boolean) => {
     if (isBinary) {
       // Binary frames: raw PCM16LE frames from offscreen
-      const length = (data as Buffer).length
-      console.log(`[WS] binary frame: ${length} bytes`)
-      // TODO: feed into STT engine
+      speechService.handleAudio(data as Buffer)
     } else {
       // JSON control frames
       try {
@@ -50,8 +53,14 @@ wss.on('connection', (socket: WebSocket) => {
       }
     }
   })
-  socket.on('close', () => console.log('[WS] client disconnected'))
-  socket.on('error', (e: Error) => console.error('[WS] error', e))
+  socket.on('close', () => {
+    console.log('[WS] client disconnected')
+    speechService.stop()
+  })
+  socket.on('error', (e: Error) => {
+    console.error('[WS] error', e)
+    speechService.stop()
+  })
 })
 
 server.listen(PORT, () => {

@@ -1,4 +1,9 @@
-node_modules
-.env
+# Ignore node_modules
+node_modules/
+
+# Ignore package-lock.json
 package-lock.json
-dist/
+
+# Ignore .env files
+.env
+.config/google-credentials.json
