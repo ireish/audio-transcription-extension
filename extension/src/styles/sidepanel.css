@@ -147,6 +147,21 @@ body {
     scrollbar-color: #ccc transparent;
 }
 
+.timestamp {
+    font-style: italic;
+    font-size: 0.9em;
+    color: #888;
+    margin-right: 8px;
+}
+
+.interim-text {
+    color: #667eea;
+}
+
+.transcription-line {
+    margin-bottom: 12px;
+}
+
 .transcription-box::-webkit-scrollbar {
     width: 4px;
 }

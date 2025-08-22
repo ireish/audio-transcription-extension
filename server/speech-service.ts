@@ -1,5 +1,4 @@
 import { v1p1beta1 as speech } from '@google-cloud/speech'
-import * as readline from 'readline'
 
 const encoding: 'LINEAR16' = 'LINEAR16'
 const sampleRateHertz = 16000
@@ -27,6 +26,7 @@ export class SpeechService {
   private lastTranscriptWasFinal = false
   private restartTimer: NodeJS.Timeout | null = null
   private onTranscription: (data: TranscriptionData) => void
+  private segmentBytesReceived = 0
 
   constructor (onTranscription: (data: TranscriptionData) => void) {
     this.client = new speech.SpeechClient()
@@ -90,26 +90,19 @@ export class SpeechService {
       stream.results[0].resultEndTime.seconds * 1000 +
       Math.round(stream.results[0].resultEndTime.nanos / 1000000)
 
-    const correctedTime =
-      this.resultEndTime - this.bridgingOffset + streamingLimit * this.restartCounter
-
     const transcript = stream.results[0].alternatives[0]
       ? stream.results[0].alternatives[0].transcript
       : ''
 
     if (stream.results[0].isFinal) {
-      // Clear the line of interim results and print the final one
-      readline.clearLine(process.stdout, 0)
-      readline.cursorTo(process.stdout, 0)
-      console.log(`[${correctedTime}ms] Final: ${transcript}`)
+      console.log(`[SpeechService] Final transcript generated from ${this.segmentBytesReceived} bytes of audio.`)
+      this.segmentBytesReceived = 0 // Reset for next segment
+
       this.onTranscription({ transcript, isFinal: true })
+
       this.isFinalEndTime = this.resultEndTime
       this.lastTranscriptWasFinal = true
     } else {
-      // Overwrite the current line with the latest interim result
-      readline.clearLine(process.stdout, 0)
-      readline.cursorTo(process.stdout, 0)
-      process.stdout.write(`[${correctedTime}ms] Interim: ${transcript}`)
       this.onTranscription({ transcript, isFinal: false })
       this.lastTranscriptWasFinal = false
     }
@@ -137,6 +130,7 @@ export class SpeechService {
   }
 
   handleAudio (chunk: Buffer) {
+    this.segmentBytesReceived += chunk.length
     if (this.newStream && this.lastAudioInput.length !== 0) {
       const chunkTime = streamingLimit / this.lastAudioInput.length
       if (chunkTime !== 0) {

@@ -2,17 +2,24 @@ import React, { useEffect, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import './styles/sidepanel.css'
 
+interface TranscriptionLine {
+  text: string
+  timestamp: string
+}
+
 const SidePanel: React.FC = () => {
   const [isRecording, setIsRecording] = useState(false)
-  const [transcriptionText, setTranscriptionText] = useState('')
+  const [lines, setLines] = useState<TranscriptionLine[]>([])
+  const [currentText, setCurrentText] = useState('')
+  const [interimText, setInterimText] = useState('')
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [errorType, setErrorType] = useState<'success' | 'error'>('error')
   const [elapsedMs, setElapsedMs] = useState(0)
   const startTimeRef = useRef<number | null>(null)
   const timerRef = useRef<number | null>(null)
+  const lineStartTimeRef = useRef<string | null>(null)
   const mediaStreamRef = useRef<MediaStream | null>(null)
   const transcriptionBoxRef = useRef<HTMLDivElement>(null)
-  const finalTranscriptRef = useRef<string>('')
   const BACKEND_WS_URL = 'ws://localhost:3001/stream'
   const BACKEND_HTTP_URL = 'http://localhost:3001/upload'
 
@@ -21,10 +28,27 @@ const SidePanel: React.FC = () => {
       if (message.type === 'TRANSCRIPTION_UPDATE') {
         const { transcript, isFinal } = message.data
         if (isFinal) {
-          finalTranscriptRef.current += transcript + ' '
-          setTranscriptionText(finalTranscriptRef.current)
+          setCurrentText(prev => {
+            const textToProcess = prev + transcript + ' '
+            const words = textToProcess.split(/\s+/).filter(Boolean)
+            
+            const newLines: TranscriptionLine[] = []
+            while (words.length >= 40) {
+              const lineWords = words.splice(0, 40)
+              newLines.push({
+                text: lineWords.join(' '),
+                timestamp: lineStartTimeRef.current!
+              })
+              lineStartTimeRef.current = new Date().toISOString()
+            }
+            if (newLines.length > 0) {
+              setLines(prevLines => [...prevLines, ...newLines])
+            }
+            return words.join(' ') + ' '
+          })
+          setInterimText('')
         } else {
-          setTranscriptionText(finalTranscriptRef.current + transcript)
+          setInterimText(transcript)
         }
       }
     }
@@ -44,7 +68,7 @@ const SidePanel: React.FC = () => {
     if (transcriptionBoxRef.current) {
       transcriptionBoxRef.current.scrollTop = transcriptionBoxRef.current.scrollHeight
     }
-  }, [transcriptionText])
+  }, [lines, currentText, interimText])
 
   const showMessage = (message: string, type: 'success' | 'error' = 'error') => {
     setErrorType(type)
@@ -75,6 +99,10 @@ const SidePanel: React.FC = () => {
       window.clearInterval(timerRef.current)
       timerRef.current = null
     }
+    if (currentText.trim()) {
+      setLines(prev => [...prev, { text: currentText.trim(), timestamp: lineStartTimeRef.current! }])
+      setCurrentText('')
+    }
   }
 
   // If needed in future: function to reset the timer
@@ -84,7 +112,10 @@ const SidePanel: React.FC = () => {
   const startTranscription = async () => {
     try {
       setErrorMessage(null)
-      setTranscriptionText('')
+      setLines([])
+      setCurrentText('')
+      setInterimText('')
+      lineStartTimeRef.current = new Date().toISOString()
 
       // Ask service worker to ensure offscreen and start
       const response = await chrome.runtime.sendMessage({
@@ -121,12 +152,21 @@ const SidePanel: React.FC = () => {
   }
 
   const copyToClipboard = async () => {
-    if (!transcriptionText.trim()) {
+    const textToCopy = [...lines, { text: currentText, timestamp: lineStartTimeRef.current! }]
+      .map(line => {
+        if (line.text) {
+          const time = `[${new Date(line.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}]`
+          return `${time} ${line.text}`
+        }
+        return ''
+      }).join('\n')
+
+    if (!textToCopy.trim()) {
       showMessage('No transcription text to copy')
       return
     }
     try {
-      await navigator.clipboard.writeText(transcriptionText)
+      await navigator.clipboard.writeText(textToCopy)
       showMessage('Text copied to clipboard!', 'success')
     } catch {
       showMessage('Failed to copy text')
@@ -134,11 +174,20 @@ const SidePanel: React.FC = () => {
   }
 
   const downloadText = () => {
-    if (!transcriptionText.trim()) {
+    const textToDownload = [...lines, { text: currentText, timestamp: lineStartTimeRef.current! }]
+      .map(line => {
+        if (line.text) {
+          const time = `[${new Date(line.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}]`
+          return `${time} ${line.text}`
+        }
+        return ''
+      }).join('\n')
+
+    if (!textToDownload.trim()) {
       showMessage('No transcription text to download')
       return
     }
-    const blob = new Blob([transcriptionText], { type: 'text/plain' })
+    const blob = new Blob([textToDownload], { type: 'text/plain' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
@@ -150,12 +199,21 @@ const SidePanel: React.FC = () => {
   }
 
   const downloadJson = () => {
-    if (!transcriptionText.trim()) {
+    const textToDownload = [...lines, { text: currentText, timestamp: lineStartTimeRef.current! }]
+      .map(line => {
+        if (line.text) {
+          const time = `[${new Date(line.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}]`
+          return `${time} ${line.text}`
+        }
+        return ''
+      }).join('\n')
+
+    if (!textToDownload.trim()) {
       showMessage('No transcription text to download')
       return
     }
     const data = {
-      transcription: transcriptionText,
+      transcription: textToDownload,
       timestamp: new Date().toISOString(),
       duration: formatTime(elapsedMs),
     }
@@ -216,12 +274,31 @@ const SidePanel: React.FC = () => {
             </div>
           </div>
           <div className="transcription-box" id="transcriptionBox" ref={transcriptionBoxRef}>
-            {isRecording && transcriptionText.length === 0 ? (
+            {isRecording && lines.length === 0 && currentText.length === 0 && interimText.length === 0 ? (
               <div style={{ color: '#667eea', fontStyle: 'italic' }}>🔴 Recording... Listening for audio input...</div>
             ) : (
-              <div className={transcriptionText ? '' : 'transcription-placeholder'}>
-                {transcriptionText || 'Click the record button to start transcribing audio...'}
-              </div>
+              <>
+                {lines.map((line, index) => (
+                  <div key={index} className="transcription-line">
+                    <span className="timestamp">
+                      [{new Date(line.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}]
+                    </span>
+                    {line.text}
+                  </div>
+                ))}
+                <div className="transcription-line">
+                  {isRecording && <span className="timestamp">
+                    [{new Date(lineStartTimeRef.current!).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}]
+                  </span>}
+                  <span>{currentText}</span>
+                  {interimText && <span className="interim-text">{interimText}</span>}
+                </div>
+                {lines.length === 0 && currentText.length === 0 && interimText.length === 0 && (
+                  <div className="transcription-placeholder">
+                    Click the record button to start transcribing audio...
+                  </div>
+                )}
+              </>
             )}
           </div>
         </div>
