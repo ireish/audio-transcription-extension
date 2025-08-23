@@ -247,7 +247,8 @@ const SidePanel: React.FC = () => {
         }
 
         if (response.title) {
-          // Don't update state yet. Wait for confirmation.
+          // Title is received, but the rest of the session state will be updated
+          // on 'RECORDING_STARTED' message to ensure sync.
           pendingSessionTitleRef.current = response.title;
         }
       } catch (e: any) {

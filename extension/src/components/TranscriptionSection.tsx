@@ -41,7 +41,7 @@ const TranscriptionSection: React.FC<TranscriptionSectionProps> = ({
             ))}
             {(appState.currentText || interimText) && (
               <div className={styles.transcriptionLine}>
-                {appState.isRecording && (
+                {appState.isRecording && appState.activeSessionIndex !== null && (
                   <span className={styles.timestamp}>
                     [{new Date(lineStartTimeRef.current || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}]
                   </span>
