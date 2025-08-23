@@ -1,10 +1,10 @@
 # Live Audio to Text Transcriber (Chrome MV3)
 A Chrome extension (Manifest V3) with a side panel UI that captures tab audio in real time using an offscreen document and streams 16kHz PCM audio to a Node.js backend over WebSocket or HTTP. The server performs speech-to-text and streams transcripts back live to the extension.
 
-Note: The backend image is currently deployed on GCP Cloud Run.
 
 
 [![Video Thumbnail Title](https://img.youtube.com/vi/npiVD7-XejM/maxresdefault.jpg)](https://www.youtube.com/watch?v=npiVD7-XejM&feature=youtu.be)
+
 
 
 ### Tech Stack
@@ -12,6 +12,8 @@ Note: The backend image is currently deployed on GCP Cloud Run.
 - **Extension**: React 19 + TypeScript, Vite, MV3 side panel, offscreen audio worklet
 - **Server**: Node.js + Express + `ws`, Google Cloud Speech-to-Text client
 - **Linting**: ESLint (TS)
+
+Note: The backend image is currently deployed on GCP Cloud Run.
 
 
 ## Development
@@ -155,12 +157,12 @@ audio-transcription-extension/
 
 ## ToDo List
 
-[ ] Capture microphone audio and process in a separate channel
-[ ] Create adapters in backend for OpenAI Whisper and other STT providers
-[ ] Switch from WS to POST automatically if connection is weak/offline
-[ ] Inactive tab audio capture
-[ ] Implement a message queue in backend for retry capability
-[ ] Use IndexedDB instead of `chrome.storage.local` to support long streams
+[] Capture microphone audio and process in a separate channel
+[] Create adapters in backend for OpenAI Whisper and other STT providers
+[] Switch from WS to POST automatically if connection is weak/offline
+[] Inactive tab audio capture
+[] Implement a message queue in backend for retry capability
+[] Use IndexedDB instead of `chrome.storage.local` to support long streams
 
 
 ### Extension Scripts (run inside `extension/`)
