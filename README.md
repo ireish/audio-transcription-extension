@@ -169,9 +169,9 @@ flowchart LR
   D -->|Tab audio -> PCM 16k via AudioWorklet| E{Transport}
   E -->|WS binary frames| F[(Node Server WS /stream)]
   E -->|HTTP chunks| G[(Node Server POST /upload)]
-  F --> H[Speech Service (Google STT)]
-  H -->|transcripts| F
-  F -->|JSON transcripts| D
+  F -->|audio data| H[Speech Service Google STT]
+  H -->|JSON transcripts| I[Transcript Handler]
+  I -->|processed transcripts| D
   D -->|TRANSCRIPTION_UPDATE| C
 ```
 
