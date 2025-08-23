@@ -4,19 +4,45 @@ A Chrome extension (Manifest V3) with a side panel UI that captures tab audio in
 Note: The backend image is currently deployed on GCP Cloud Run.
 
 
-[![Video Thumbnail Title](https://img.youtube.com/vi/Your-Video-ID/maxresdefault.jpg)](https://www.youtube.com/watch?v=Your-Video-ID)
+[![Video Thumbnail Title](https://img.youtube.com/vi/npiVD7-XejM/maxresdefault.jpg)](https://www.youtube.com/watch?v=npiVD7-XejM&feature=youtu.be)
 
 
+### Tech Stack
 
-## Features
+- **Extension**: React 19 + TypeScript, Vite, MV3 side panel, offscreen audio worklet
+- **Server**: Node.js + Express + `ws`, Google Cloud Speech-to-Text client
+- **Linting**: ESLint (TS)
 
-- **Real-time transcription**: Live partial and final transcripts streamed to the side panel
-- **MV3 side panel UI**: Modern React 19 UI available on any tab via the extension action
-- **Tab audio capture (no content script required)**: Uses `chrome.tabCapture` and an MV3 offscreen document
-- **Robust transport**: Primary WS streaming with automatic fallback to HTTP chunk upload
-- **Session management**: Multiple sessions with titles (per-tab), timestamps, and auto-scrolling
-- **Copy & export**: One-click copy, TXT and JSON export of the full transcript
-- **Resilient handling**: Connection status indicator, auto-reconnect prompts, and safe stop/clear
+
+## Development
+
+### Prerequisites
+
+- Node.js 18+
+- npm or yarn
+- Chrome (latest)
+
+
+## High-level Architecture
+
+```mermaid
+flowchart LR
+  A[User clicks extension action] --> B[MV3 Service Worker]
+  B -->|open| C[MV3 Side Panel UI]
+  B -->|create offscreen| D[Offscreen Document]
+  C -->|OFFSCREEN_START| B
+  B -->|getMediaStreamId + START| D
+  D -->|Tab audio -> PCM 16k via AudioWorklet| E{Transport}
+  E -->|WS binary frames| F[(Node Server WS /stream)]
+  E -->|HTTP chunks| G[(Node Server POST /upload)]
+  F -->|audio data| H[Speech Service Google STT]
+  H -->|JSON transcripts| I[Transcript Handler]
+  I -->|processed transcripts| D
+  D -->|TRANSCRIPTION_UPDATE| C
+```
+
+Note: The backend image is currently deployed on GCP Cloud Run.
+
 
 ## Quick Setup
 
@@ -50,7 +76,7 @@ Step-by-step (beginner-friendly):
 6. Copy `server/.env.example` to `server/.env` and set:
    ```bash
    PORT=3001
-   GOOGLE_APPLICATION_CREDENTIALS=/app/.config/google-credentials.json
+   GOOGLE_APPLICATION_CREDENTIALS=/server/.config/google-credentials.json
    ```
    - For local runs without Docker, you can set an absolute path to your JSON key
    - For Cloud Run, prefer assigning a service account to the service (no key file)
@@ -101,30 +127,6 @@ PORT=3001
 # GOOGLE_APPLICATION_CREDENTIALS=/absolute/path/to/your-service-account.json
 ```
 
-## Development
-
-### Prerequisites
-
-- Node.js 18+
-- npm or yarn
-- Chrome (latest)
-
-### Tech Stack
-
-- **Extension**: React 19 + TypeScript, Vite, MV3 side panel, offscreen audio worklet
-- **Server**: Node.js + Express + `ws`, Google Cloud Speech-to-Text client
-- **Linting**: ESLint (TS)
-
-### Extension Scripts (run inside `extension/`)
-```bash
-npm run build        # Build extension to dist/
-```
-
-### Server Scripts (run inside `server/`)
-```bash
-npm run build        # Build TypeScript
-npm run start        # Start server (ts-node or compiled depending on package.json)
-```
 
 ### Project Structure
 
@@ -150,6 +152,29 @@ audio-transcription-extension/
    └── utils/logger.ts             # pino logger
 ```
 
+
+## ToDo List
+
+[ ] Capture microphone audio and process in a separate channel
+[ ] Create adapters in backend for OpenAI Whisper and other STT providers
+[ ] Switch from WS to POST automatically if connection is weak/offline
+[ ] Inactive tab audio capture
+[ ] Implement a message queue in backend for retry capability
+[ ] Use IndexedDB instead of `chrome.storage.local` to support long streams
+
+
+### Extension Scripts (run inside `extension/`)
+```bash
+npm run build        # Build extension to dist/
+```
+
+### Server Scripts (run inside `server/`)
+```bash
+npm run build        # Build TypeScript
+npm run start        # Start server (ts-node or compiled depending on package.json)
+```
+
+
 ## Permissions (MV3)
 
 From `extension/src/manifest.json`:
@@ -161,6 +186,7 @@ From `extension/src/manifest.json`:
 - `offscreen`
 - `host_permissions`: `<all_urls>`
 
+
 ## Privacy & Security
 
 - Audio is captured from the active tab only when you press record
@@ -168,34 +194,6 @@ From `extension/src/manifest.json`:
 - No analytics are collected; state is stored locally via `chrome.storage.local`
 - Review and comply with Chrome Web Store privacy policies if distributing
 
-## High-level Architecture
-
-```mermaid
-flowchart LR
-  A[User clicks extension action] --> B[MV3 Service Worker]
-  B -->|open| C[MV3 Side Panel UI]
-  B -->|create offscreen| D[Offscreen Document]
-  C -->|OFFSCREEN_START| B
-  B -->|getMediaStreamId + START| D
-  D -->|Tab audio -> PCM 16k via AudioWorklet| E{Transport}
-  E -->|WS binary frames| F[(Node Server WS /stream)]
-  E -->|HTTP chunks| G[(Node Server POST /upload)]
-  F -->|audio data| H[Speech Service Google STT]
-  H -->|JSON transcripts| I[Transcript Handler]
-  I -->|processed transcripts| D
-  D -->|TRANSCRIPTION_UPDATE| C
-```
-
-Note: The backend image is currently deployed on GCP Cloud Run.
-
-## ToDo List
-
-- Capture microphone audio and process in a separate channel
-- Create adapters in backend for OpenAI Whisper and other STT providers
-- Switch from WS to POST automatically if connection is weak/offline
-- Inactive tab audio capture
-- Implement a message queue in backend for retry capability
-- Use IndexedDB instead of `chrome.storage.local` to support long streams
 
 ## License
 
