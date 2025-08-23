@@ -1,6 +1,12 @@
 # Live Audio to Text Transcriber (Chrome MV3)
+A Chrome extension (Manifest V3) with a side panel UI that captures tab audio in real time using an offscreen document and streams 16kHz PCM audio to a Node.js backend over WebSocket or HTTP. The server performs speech-to-text and streams transcripts back live to the extension.
 
-A Chrome extension (Manifest V3) with a side panel UI that captures tab audio in real time using an offscreen document and streams 16kHz PCM audio to a local Node.js server over WebSocket or HTTP. The server performs speech-to-text and streams transcripts back live to the extension.
+Note: The backend image is currently deployed on GCP Cloud Run.
+
+
+[![Video Thumbnail Title](https://img.youtube.com/vi/Your-Video-ID/maxresdefault.jpg)](https://www.youtube.com/watch?v=Your-Video-ID)
+
+
 
 ## Features
 
@@ -31,13 +37,23 @@ cd ../server
 npm install
 ```
 
-### 3) Configure server environment (optional)
-Create `server/.env` if you want to change the port (defaults to 3001):
-```bash
-PORT=3001
-```
+### 3) Configure backend credentials (.env + Google Service Account)
 
-If using Google Cloud Speech-to-Text, ensure your environment has credentials configured (e.g., `GOOGLE_APPLICATION_CREDENTIALS`).
+The backend uses Google Cloud Speech-to-Text. You need a service account with the right role and a credential file.
+
+Step-by-step (beginner-friendly):
+1. Create a Google Cloud project (or use an existing one)
+2. Enable the Speech-to-Text API
+3. Create a Service Account with the role: "Cloud Speech Client"
+4. Create a JSON key for that service account and download it
+5. Place the JSON key at: `server/.config/google-credentials.json`
+6. Copy `server/.env.example` to `server/.env` and set:
+   ```bash
+   PORT=3001
+   GOOGLE_APPLICATION_CREDENTIALS=/app/.config/google-credentials.json
+   ```
+   - For local runs without Docker, you can set an absolute path to your JSON key
+   - For Cloud Run, prefer assigning a service account to the service (no key file)
 
 ### 4) Start the server
 ```bash
@@ -101,18 +117,13 @@ PORT=3001
 
 ### Extension Scripts (run inside `extension/`)
 ```bash
-npm run dev          # Vite dev server (for building; MV3 loads built files)
-npm run build        # Type-check and build extension to dist/
-npm run build:watch  # Watch build
-npm run lint         # ESLint
-npm run preview      # Preview production build
+npm run build        # Build extension to dist/
 ```
 
 ### Server Scripts (run inside `server/`)
 ```bash
-npm run start        # Start TS server with ts-node
-npm run build        # Type-check and build
-npm run start:prod   # Run compiled server (dist)
+npm run build        # Build TypeScript
+npm run start        # Start server (ts-node or compiled depending on package.json)
 ```
 
 ### Project Structure
@@ -174,6 +185,17 @@ flowchart LR
   I -->|processed transcripts| D
   D -->|TRANSCRIPTION_UPDATE| C
 ```
+
+Note: The backend image is currently deployed on GCP Cloud Run.
+
+## ToDo List
+
+- Capture microphone audio and process in a separate channel
+- Create adapters in backend for OpenAI Whisper and other STT providers
+- Switch from WS to POST automatically if connection is weak/offline
+- Inactive tab audio capture
+- Implement a message queue in backend for retry capability
+- Use IndexedDB instead of `chrome.storage.local` to support long streams
 
 ## License
 
