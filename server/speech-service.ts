@@ -1,4 +1,5 @@
 import { v1p1beta1 as speech } from '@google-cloud/speech'
+import { logger } from './utils/logger'
 
 const encoding: 'LINEAR16' = 'LINEAR16'
 const sampleRateHertz = 16000
@@ -37,12 +38,12 @@ export class SpeechService {
   }
 
   start () {
-    console.log('Starting speech recognition stream...')
+    logger.info('Starting speech recognition stream...')
     this.startStream()
   }
 
   stop () {
-    console.log('Stopping speech recognition stream.')
+    logger.info('Stopping speech recognition stream.')
     if (this.restartTimer) {
       clearTimeout(this.restartTimer)
       this.restartTimer = null
@@ -69,10 +70,10 @@ export class SpeechService {
       .streamingRecognize(request)
       .on('error', (err: any) => {
         if (err.code === 11) { // DEADLINE_EXCEEDED
-          console.log('Streaming deadline exceeded. Restarting stream.')
+          logger.warn('Streaming deadline exceeded. Restarting stream.')
           this.restartStream()
         } else {
-          console.error('API request error', err)
+          logger.error(err, 'API request error')
           this.restartStream()
         }
       })
@@ -95,7 +96,9 @@ export class SpeechService {
       : ''
 
     if (stream.results[0].isFinal) {
-      console.log(`[SpeechService] Final transcript generated from ${this.segmentBytesReceived} bytes of audio.`)
+      logger.info(
+        `[SpeechService] Final transcript generated from ${this.segmentBytesReceived} bytes of audio.`
+      )
       this.segmentBytesReceived = 0 // Reset for next segment
 
       this.onTranscription({ transcript, isFinal: true })
@@ -122,7 +125,7 @@ export class SpeechService {
     if (!this.lastTranscriptWasFinal) {
       process.stdout.write('\n')
     }
-    console.log(`\nRestarting stream request #${this.restartCounter}`)
+    logger.info(`\nRestarting stream request #${this.restartCounter}`)
 
     this.newStream = true
 
@@ -152,7 +155,7 @@ export class SpeechService {
             try {
               this.recognizeStream.write(this.lastAudioInput[i])
             } catch (e) {
-              console.error('Error writing to stream:', e)
+              logger.error(e, 'Error writing to stream:')
             }
           }
         }
@@ -166,7 +169,7 @@ export class SpeechService {
       try {
         this.recognizeStream.write(chunk)
       } catch (e) {
-        console.error('Error writing to stream:', e)
+        logger.error(e, 'Error writing to stream:')
       }
     }
   }
