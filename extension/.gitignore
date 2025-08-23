@@ -5,3 +5,4 @@ build
 .cursor/
 package-lock.json
 .temp
+.env.production
