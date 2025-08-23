@@ -157,12 +157,12 @@ audio-transcription-extension/
 
 ## ToDo List
 
-[] Capture microphone audio and process in a separate channel
-[] Create adapters in backend for OpenAI Whisper and other STT providers
-[] Switch from WS to POST automatically if connection is weak/offline
-[] Inactive tab audio capture
-[] Implement a message queue in backend for retry capability
-[] Use IndexedDB instead of `chrome.storage.local` to support long streams
+- [ ] Capture microphone audio and process in a separate channel
+- [ ] Create adapters in backend for OpenAI Whisper and other STT providers
+- [ ] Switch from WS to POST automatically if connection is weak/offline
+- [ ] Inactive tab audio capture
+- [ ] Implement a message queue in backend for retry capability
+- [ ] Use IndexedDB instead of `chrome.storage.local` to support long streams
 
 
 ### Extension Scripts (run inside `extension/`)
