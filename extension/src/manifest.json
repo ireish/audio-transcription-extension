@@ -22,9 +22,13 @@
         "default_path": "sidepanel.html"
     },
     "background": {
-        "service_worker": "src/service-worker.ts"
+        "service_worker": "src/service-worker.ts",
+        "type": "module"
     },
     "host_permissions": [
         "<all_urls>"
-    ]
+    ],
+    "content_security_policy": {
+        "extension_pages": "script-src 'self'; object-src 'self'; connect-src 'self' https://audio-stt-server-606036182503.us-west1.run.app wss://audio-stt-server-606036182503.us-west1.run.app;"
+      }
 }
