@@ -170,7 +170,7 @@ flowchart LR
   E -->|WS binary frames| F[(Node Server WS /stream)]
   E -->|HTTP chunks| G[(Node Server POST /upload)]
   F --> H[Speech Service (Google STT)]
-  H --> F
+  H -->|transcripts| F
   F -->|JSON transcripts| D
   D -->|TRANSCRIPTION_UPDATE| C
 ```
