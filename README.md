@@ -46,7 +46,24 @@ flowchart LR
 Note: The backend image is currently deployed on GCP Cloud Run.
 
 
-## Quick Setup
+## Quick Use (Pre-built Extension)
+
+Use this method to quickly test the extension without any local setup. This uses the included pre-built dist/ folder and connects to a public backend server by default.
+
+### 1) Unzip the File: Find the `audio-to-speech-extension.zip` file in the project root and extract it. You will get a folder named dist inside audio-to-speech-extension/.
+
+### 2) Open Chrome Extensions: Open your Chrome browser and navigate to `chrome://extensions/`.
+
+### 3) Enable Developer Mode: In the top-right corner, toggle on "Developer mode".
+
+### 4) Load the Extension: Click the "Load unpacked" button and select the dist folder you extracted in the first step.
+
+### 5) The extension is now installed and ready to use!
+
+
+## Local Development Setup (Build from Source)
+
+Follow these steps if you want to run your own local server, modify the code, and build the extension from scratch.
 
 ### 1) Clone the repo
 ```bash
@@ -101,15 +118,6 @@ npm run build
 - Toggle on Developer mode
 - Click "Load unpacked" and select `extension/dist`
 
-## Usage
-
-1) Click the extension icon to open the side panel for the active tab.
-2) Ensure the backend server is running; the side panel shows online/offline status.
-3) Press the record button. The extension will:
-   - Request a tab-capture stream ID via `chrome.tabCapture.getMediaStreamId`
-   - Spin up an offscreen document to process audio frames at 16 kHz
-   - Stream PCM frames over WS (or batch via HTTP fallback)
-4) Watch live transcripts update. Toggle recording to stop; export or copy results.
 
 ## Configuration
 
