@@ -50,15 +50,15 @@ Note: The backend image is currently deployed on GCP Cloud Run.
 
 Use this method to quickly test the extension without any local setup. This uses the included pre-built dist/ folder and connects to a public backend server by default.
 
-# 1) Unzip the File: Find the `audio-to-speech-extension.zip` file in the project root and extract it. You will get a folder named dist inside audio-to-speech-extension/.
+1) Unzip the File: Find the `audio-to-speech-extension.zip` file in the project root and extract it. You will get a folder named dist inside audio-to-speech-extension/.
 
-# 2) Open Chrome Extensions: Open your Chrome browser and navigate to `chrome://extensions/`.
+2) Open Chrome Extensions: Open your Chrome browser and navigate to `chrome://extensions/`.
 
-# 3) Enable Developer Mode: In the top-right corner, toggle on "Developer mode".
+3) Enable Developer Mode: In the top-right corner, toggle on "Developer mode".
 
-# 4) Load the Extension: Click the "Load unpacked" button and select the dist folder you extracted in the first step.
+4) Load the Extension: Click the "Load unpacked" button and select the dist folder you extracted in the first step.
 
-# 5) The extension is now installed and ready to use!
+5) The extension is now installed and ready to use!
 
 
 ## Local Development Setup (Build from Source)
